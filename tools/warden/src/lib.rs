@@ -1,14 +1,12 @@
-pub fn add(left: u64, right: u64) -> u64 {
-    left + right
-}
+pub mod defender;
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
-}
+pub use defender::{
+    DefenderError,
+    DefenderStatus,
+    is_defender_installed,
+    get_defender_status,
+    is_defender_enabled,
+    get_signature_version,
+    get_signature_last_update,
+    is_real_time_protection_enabled
+};
