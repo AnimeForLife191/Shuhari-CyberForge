@@ -1,0 +1,4 @@
+[workspace]
+members = ["cli", "tools/orion", "tools/warden"]
+
+resolver = "3"
