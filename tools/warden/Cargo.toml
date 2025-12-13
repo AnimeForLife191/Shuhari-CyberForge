@@ -5,6 +5,8 @@ edition = "2024"
 
 [dependencies]
 thiserror.workspace = true
+serde.workspace = true
+wmi.workspace = true
 
 [target.'cfg(windows)'.dependencies]
 winreg.workspace = true

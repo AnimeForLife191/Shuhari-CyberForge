@@ -1,4 +1,5 @@
 pub mod defender;
+pub mod updates;
 
 pub use defender::{
     DefenderError,

@@ -25,21 +25,22 @@ pub struct DefenderStatus {
 // IS WINDOWS DEFENDER INSTALLED?
 // ========================================================
 
-#[cfg(windows)]
+#[cfg(windows)] // Only Runs On Windows Machine
 pub fn is_defender_installed() -> Result<bool, DefenderError> {
     use winreg::enums::*;
     use winreg::RegKey;
 
-    let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
+    let hklm = RegKey::predef(HKEY_LOCAL_MACHINE); // Creating Handle To The Specified Hive
 
-    match hklm.open_subkey("SOFTWARE\\Microsoft\\Windows Defender") {
-        Ok(_) => Ok(true),
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(false),
-        Err(e) => Err(DefenderError::RegistryAccess(e))
+    // Does "Windows Defender" Exist In Registry
+    match hklm.open_subkey("SOFTWARE\\Microsoft\\Windows Defender") { // Path To The Specified Registry
+        Ok(_) => Ok(true), // Found/Installed
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(false), // Missing/Uninstalled
+        Err(e) => Err(DefenderError::RegistryAccess(e)) // Registry Can't Be Accessed
     }
 }
 
-#[cfg(not(windows))]
+#[cfg(not(windows))] // Any Machine Not Windows Runs This
 pub fn is_defender_installed() -> Result<bool, DefenderError> {
     Err(DefenderError::NotWindows)
 }
@@ -56,11 +57,12 @@ pub fn is_defender_enabled() -> Result<bool, DefenderError> {
     let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
     let defender_key = hklm.open_subkey("SOFTWARE\\Microsoft\\Windows Defender");
 
+    // If Error, Return Immediately | If OK, Get Value
     match defender_key?.get_value::<u32, _>("DisableAntiSpyware") {
-        Ok(0) => Ok(true),
-        Ok(_) => Ok(false),
+        Ok(0) => Ok(true), // Is Enabled
+        Ok(_) => Ok(false), // Is Disabled
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-            Ok(true)
+            Ok(true) // Is Enabled By Default
         }
         Err(e) => Err(DefenderError::RegistryAccess(e))
     }
@@ -72,7 +74,7 @@ pub fn is_defender_enabled() -> Result<bool, DefenderError> {
 }
 
 // ========================================================
-// ARE LATEST DEFINITIONS INSTALLED?
+// ARE LATEST DEFINITIONS INSTALLED? 
 // ========================================================
 
 #[cfg(windows)]
@@ -81,7 +83,7 @@ pub fn get_signature_version() -> Result<String, DefenderError> {
     use winreg::RegKey;
 
     let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
-    let sig_key = hklm.open_subkey("SOFTWARE\\Microsoft\\Windows Defender\\Signature Updates")?;
+    let sig_key = hklm.open_subkey("SOFTWARE\\Microsoft\\Windows Defender\\Signature Updates")?; // TODO: Signature Vlaue Not Being Grabbed
 
     // Getting Signature Version
     match sig_key.get_value::<String, _>("ASSignatureVersion") {
@@ -103,7 +105,7 @@ pub fn get_signature_last_update() -> Result<String, DefenderError> {
     use winreg::RegKey;
 
     let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
-    let sig_key = hklm.open_subkey("SOFTWARE\\Microsoft\\Windows Defender\\Signature Updates")?;
+    let sig_key = hklm.open_subkey("SOFTWARE\\Microsoft\\Windows Defender\\Signature Updates")?; // TODO: Double Check Registry Path
 
     match sig_key.get_value::<String, _>("SignatureUpdateTime") {
         Ok(time) => Ok(time),
