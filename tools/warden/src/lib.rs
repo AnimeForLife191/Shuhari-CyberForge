@@ -1,7 +1,9 @@
-pub mod defender;
+pub mod old_defender;
 pub mod updates;
 
-pub use defender::{
+
+
+pub use old_defender::{
     DefenderError,
     DefenderStatus,
     is_defender_installed,
