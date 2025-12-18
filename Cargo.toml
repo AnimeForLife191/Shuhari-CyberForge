@@ -4,8 +4,7 @@ members = ["cli", "tools/orion", "tools/warden"]
 resolver = "3"
 
 [workspace.dependencies]
-winreg = "0.55.0"
 wmi = "0.18"
-thiserror = "2"
 serde = "1.0.228"
-clap = {version = "4.5.53", features = ["derive"]}
+rustyline = "17.0.2"
+colored = "3.0.0"

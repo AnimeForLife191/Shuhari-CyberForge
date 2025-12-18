@@ -5,4 +5,6 @@ edition = "2024"
 
 [dependencies]
 warden = {path = "../tools/warden"}
-clap.workspace = true
+
+rustyline.workspace = true
+colored.workspace = true
