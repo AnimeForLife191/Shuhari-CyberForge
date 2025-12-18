@@ -1,5 +1,5 @@
 use wmi::{WMIConnection, Variant};
-use std::{collections::HashMap, net::ToSocketAddrs};
+use std::collections::HashMap;
 
 
 
@@ -10,6 +10,12 @@ struct AntiVirusProduct {
     is_active: bool,
     realtime_on: bool,
     definitions_updated: bool
+}
+
+
+pub enum DisplayMode {
+    Normal,
+    Technical
 }
 
 
@@ -43,14 +49,55 @@ impl AntiVirusProduct {
 
     }
 
-    // Displays output
-    fn display(&self, index: usize) {
+    fn display_normal(&self, index: usize) {
+        println!("{}. {}", index, self.name);
+        println!("{}", "-".repeat(30));
+
+        if self.is_fully_protected() {
+            println!("✅ STATUS: Fully Protected");
+            println!("    - Real-time scanning is active");
+            println!("    - Virus definitions are current");
+        } else if !self.is_active {
+            println!("❌ STATUS: Disabled");
+            println!("    - This antivirus is not running");
+            println!("    - Your device may be at risk");
+        } else if !self.realtime_on {
+            println!("⚠️ STATUS: Partially Protected");
+            println!("    - Antivirus is running");
+            println!("    - Real-time protection is OFF");
+            println!("    - New threats may not be blocked");
+        } else if !self.definitions_updated {
+            println!("⚠️ STATUS: Outdated");
+            println!("    - Antivirus is running");
+            println!("    - Virus definitions are old");
+            println!("    - May not detect new threats");
+        }
+    }
+
+    fn display_technical(&self, index: usize) {
         println!("Product #{}", index);
-        println!("  Name: {}", self.name);
-        println!("  Raw State: {} (0x{:06X})", self.state, self.state);
-        println!("  Active: {}", if self.is_active {"Yes"} else {"No"});
-        println!("  RealTime Protection: {}", if self.realtime_on {"On"} else {"Off"});
-        println!("  Definitions: {}", if self.definitions_updated {"Up-to-date"} else {"Out-of-date"});
+        println!("{}", "=".repeat(40));
+        println!("Name:               {}", self.name);
+        println!("State (Decimal):    {}", self.state);
+        println!("State (Hex):        {}", self.state_hex());
+        println!("Active:             {}", self.is_active);
+        println!("Real-time:          {}", self.realtime_on);
+        println!("Definitions:        {}", self.definitions_updated);
+        
+
+        // Bits decoded
+        println!("\nBit Analysis:");
+        println!("  Bits 12-15 (Active):     0x{:X}", (self.state >> 12) & 0xF);
+        println!("  Bits 12-15 (Running):    0x{:X}", (self.state >> 8) & 0xF);
+        println!("  Bits 0-7   (Definitions):0x{:02X}", self.state & 0xFF);
+        println!();
+    }
+
+    fn display(&self, index: usize, mode: &DisplayMode) {
+        match mode {
+            DisplayMode::Normal => self.display_normal(index),
+            DisplayMode::Technical => self.display_technical(index),
+        }
     }
 
     // Helper method to get state as hex
@@ -63,18 +110,10 @@ impl AntiVirusProduct {
         self.is_active && self.realtime_on && self.definitions_updated
     }
 
-    // Gives full summary to you
-    fn summary(&self) -> String {
-        let status = if self.is_active {"✅"} else {"❌"};
-        let realtime = if self.realtime_on {"✅"} else {"❌"};
-        let definitions = if self.definitions_updated {"✅"} else {"❌"};
-
-        format!("{} {} {} - {}", status, realtime, definitions, self.name)
-    }
 }
 
 
-pub fn antivirus_software() -> Result<(), Box<dyn std::error::Error>> {
+pub fn antivirus_software(mode: DisplayMode) -> Result<(), Box<dyn std::error::Error>> {
 
     // This connects us to the name space we need for the antivirus query
     let wmi_con = WMIConnection::with_namespace_path("ROOT\\SecurityCenter2")?;
@@ -98,17 +137,72 @@ pub fn antivirus_software() -> Result<(), Box<dyn std::error::Error>> {
 
     // Iterate through each antivirus product found
     for (i, product) in products.iter().enumerate() {
-        product.display(i + 1);
+        product.display(i + 1, &mode);
     }
 
-    println!("\nSummary:");
-    for product in &products {
-        println!("  {}", product.summary());
-    }
-
-    let fully_protected = products.iter().filter(|p| p.is_fully_protected()).count();
-    println!("\n{}/{} products fully protected", fully_protected, products.len());
+    display_summary(&products, &mode);
     
     Ok(())
 
+}
+
+fn display_summary(products: &[AntiVirusProduct], mode: &DisplayMode) {
+    match mode {
+        DisplayMode::Normal => {
+            let fully_protected = products.iter().filter(|p| p.is_fully_protected()).count();
+            let disabled = products.iter().filter(|p| !p.is_active).count();
+            let partial = products.len() - fully_protected - disabled;
+
+            println!("\n{}", "=".repeat(40));
+            println!("SUMMARY");
+            println!("{}", "=". repeat(40));
+            println!("Total antivirus programs: {}", products.len());
+            println!("Fully protected: {}", fully_protected);
+
+            if disabled > 0 {
+                println!("Disabled: {}", disabled);
+                println!("  - Enable at least one antivirus");
+            }
+
+            if partial > 0 {
+                println!("Need attention: {}", partial);
+                println!("Check real-time protection and updates");
+            }
+
+            if fully_protected == products.len() && products.len() > 0 {
+                println!("All antivirus programs are fully protected")
+            }
+        }
+
+        DisplayMode::Technical => {
+            println!("\n{}", "=".repeat(40));
+            println!("TECHNICAL SUMMARY");
+            println!("{}", "=".repeat(40));
+
+            for (i, product) in products.iter().enumerate() {
+                println!("{}. {}:", i + 1, product.name);
+                println!("  State: 0x{:06X} ({})", product.state, product.state);
+                println!("  Fully Protected: {}", product.is_fully_protected());
+                println!();
+            }
+
+            let security_score: f32 = products.iter().map(|p| {
+                    let mut score = 0.0;
+                    if p.is_active {score += 0.4;}
+                    if p.realtime_on {score += 0.3;}
+                    if p.definitions_updated {score += 0.3}
+                    score
+            }).sum::<f32>() / products.len() as f32 * 100.0;
+
+            println!("Overall Security Score: {:.1}%", security_score);
+        }
+    }
+}
+
+pub fn antivirus_check() -> Result<(), Box<dyn std::error::Error>> {
+    antivirus_software(DisplayMode::Normal)
+}
+
+pub fn antivirus_detailed_check() -> Result<(), Box<dyn std::error::Error>> {
+    antivirus_software(DisplayMode::Technical)
 }

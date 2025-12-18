@@ -1,7 +1,7 @@
 use colored::Colorize;
 use rustyline::{DefaultEditor, error::ReadlineError};
 
-use warden::antivirus::scanner::antivirus_software;
+use warden::antivirus::scanner::{antivirus_check, antivirus_detailed_check};
 
 use crate::banners::warden_banners::warden_home_banner;
 
@@ -57,7 +57,14 @@ fn handle_antivirus_command(args: &[&str]) {
     match args[0].to_lowercase().as_str() {
         "check" => {
             println!("{}", "Running Antivirus Check".green());
-            if let Err(e) = antivirus_software() {
+            if let Err(e) = antivirus_check() {
+                println!("{}", format!("Error: {}", e).red());
+            }
+        }
+
+        "detail" => {
+            println!("{}", "Running Detailed Antivirus Check".green());
+            if let Err(e) = antivirus_detailed_check() {
                 println!("{}", format!("Error: {}", e).red());
             }
         }
