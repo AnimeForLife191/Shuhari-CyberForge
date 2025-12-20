@@ -2,6 +2,7 @@ use colored::Colorize;
 use rustyline::{DefaultEditor, error::ReadlineError};
 
 use warden::antivirus::scanner::{antivirus_check, antivirus_detailed_check};
+use warden::updates::windows_update_scanner::updates_check;
 
 use crate::banners::warden_banners::warden_home_banner;
 
@@ -29,6 +30,10 @@ pub fn warden_shell(rl: &mut DefaultEditor) {
                         handle_antivirus_command(args);
                     }
 
+                    "updates" => {
+                        handle_update_commands(args);
+                    }
+
                     _ => {
                         println!("{}", format!("Unknown command: '{}'. Type 'help' for available commands.", command).red());
                     }
@@ -50,7 +55,7 @@ pub fn warden_shell(rl: &mut DefaultEditor) {
 
 fn handle_antivirus_command(args: &[&str]) {
     if args.is_empty() {
-        println!("{}", "Usage: antivirus <check>".yellow());
+        println!("{}", "Usage: antivirus <check, detail>".yellow());
         return;
     }
 
@@ -68,6 +73,26 @@ fn handle_antivirus_command(args: &[&str]) {
                 println!("{}", format!("Error: {}", e).red());
             }
         }
+        _ => {
+            println!("{}", format!("Unkonwn antivirus command: '{}'", args[0]).red());
+        }
+    }
+}
+
+fn handle_update_commands(args: &[&str]) {
+    if args.is_empty() {
+        println!("{}", "Usage: update <check>".yellow());
+        return;
+    }
+
+    match args[0].to_lowercase().as_str() {
+        "check" => {
+            println!("{}", "Running Update Check".green());
+            if let Err(e) = updates_check() {
+                println!("{}", format!("Error: {}", e).red());
+            }
+        }
+
         _ => {
             println!("{}", format!("Unkonwn antivirus command: '{}'", args[0]).red());
         }
