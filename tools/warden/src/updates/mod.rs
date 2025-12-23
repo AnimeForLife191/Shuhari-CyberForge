@@ -1,1 +1,1 @@
-pub mod windows_update_scanner;
+pub mod scanner;

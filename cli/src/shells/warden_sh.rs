@@ -1,8 +1,8 @@
 use colored::Colorize;
 use rustyline::{DefaultEditor, error::ReadlineError};
 
-use warden::antivirus::scanner::{antivirus_check, antivirus_detailed_check};
-use warden::updates::windows_update_scanner::updates_check;
+use warden::antivirus::scanner::{antivirus_wmi_api};
+use warden::updates::scanner::{update_com_api};
 
 use crate::banners::warden_banners::warden_home_banner;
 
@@ -62,17 +62,18 @@ fn handle_antivirus_command(args: &[&str]) {
     match args[0].to_lowercase().as_str() {
         "check" => {
             println!("{}", "Running Antivirus Check".green());
-            if let Err(e) = antivirus_check() {
+            if let Err(e) = antivirus_wmi_api() {
                 println!("{}", format!("Error: {}", e).red());
             }
         }
-
+        /*
         "detail" => {
             println!("{}", "Running Detailed Antivirus Check".green());
             if let Err(e) = antivirus_detailed_check() {
                 println!("{}", format!("Error: {}", e).red());
             }
         }
+        */
         _ => {
             println!("{}", format!("Unkonwn antivirus command: '{}'", args[0]).red());
         }
@@ -88,7 +89,7 @@ fn handle_update_commands(args: &[&str]) {
     match args[0].to_lowercase().as_str() {
         "check" => {
             println!("{}", "Running Update Check".green());
-            if let Err(e) = updates_check() {
+            if let Err(e) = update_com_api() {
                 println!("{}", format!("Error: {}", e).red());
             }
         }

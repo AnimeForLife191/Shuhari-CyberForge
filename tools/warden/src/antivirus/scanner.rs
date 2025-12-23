@@ -1,208 +1,237 @@
-use wmi::{WMIConnection, Variant};
-use std::collections::HashMap;
+use std::mem::MaybeUninit;
+use windows::core::*;
+use windows::Win32::System::Variant::*;
+use windows::Win32::System::Com::*;
+use windows::Win32::System::Wmi::*;
 
-
-
-#[derive(Debug)]
-struct AntiVirusProduct {
+struct ProductInfo {
     name: String,
-    state: u32,
+    state: i32,
     is_active: bool,
-    realtime_on: bool,
-    definitions_updated: bool
+    is_realtime: bool,
+    defin_new: bool
 }
 
+/// Grabing antivirus for Windows
+pub fn antivirus_wmi_api() -> Result<()> {
+    unsafe { // We use windows unsafe block here because were using foreign functions that are unsafe with Rust
+        /*
+            WARDEN: COM Apartments
 
-pub enum DisplayMode {
-    Normal,
-    Technical
-}
+             As you see we are using 'CoInitializeEx(None, COINIT_MULTITHREADED)'. This initializes:
+            - MTA (Multi-Threaded Apartment): Objects can move between threads
+            - Alternative: STA (Single-Threaded) with 'CoInitialize(None)'
 
+            Why use MTA for WARDEN, well why not....WARDEN might use threads later so trying to learn it now is better.
+            Its also more flexible for system tools.
 
+            The trade off of using MTA is the cleanup
+        */
 
-impl AntiVirusProduct {
-    fn from_wmi_data(av: &HashMap<String, Variant>) -> Option<Self> {
-        let name = match av.get("displayName") {
-            Some(Variant::String(name)) => name.clone(),
-            _ => return None
-        };
-
-        let state = match av.get("productState") {
-            Some(Variant::UI4(state)) => *state as u32,
-            _ => return None
-        };
-
-        // (bits 12-15: 0x0 = disabled, anything else = enabled)
-        let is_active = ((state >> 12) & 0xF) != 0;
-        // (bits 12-15: 0x1 = on, 0x2 = off)
-        let realtime_on = ((state >> 12) & 0xF) == 1;
-        // (bits 0-7: 0x00 = updated)
-        let definitions_updated = (state & 0xFF) == 0x00;
-
-        Some(Self {
-            name, 
-            state, 
-            is_active,
-            realtime_on, 
-            definitions_updated
-        })
-
-    }
-
-    fn display_normal(&self, index: usize) {
-        println!("{}. {}", index, self.name);
-        println!("{}", "-".repeat(30));
-
-        if self.is_fully_protected() {
-            println!("✅ STATUS: Fully Protected");
-            println!("    - Real-time scanning is active");
-            println!("    - Virus definitions are current");
-        } else if !self.is_active {
-            println!("❌ STATUS: Disabled");
-            println!("    - This antivirus is not running");
-            println!("    - Your device may be at risk");
-        } else if !self.realtime_on {
-            println!("⚠️ STATUS: Partially Protected");
-            println!("    - Antivirus is running");
-            println!("    - Real-time protection is OFF");
-            println!("    - New threats may not be blocked");
-        } else if !self.definitions_updated {
-            println!("⚠️ STATUS: Outdated");
-            println!("    - Antivirus is running");
-            println!("    - Virus definitions are old");
-            println!("    - May not detect new threats");
+        let _com = CoInitializeEx(None, COINIT_MULTITHREADED);
+        if _com.is_err() { 
+            return Err(_com.into()); // Error Check
         }
-    }
 
-    fn display_technical(&self, index: usize) {
-        println!("Product #{}", index);
-        println!("{}", "=".repeat(40));
-        println!("Name:               {}", self.name);
-        println!("State (Decimal):    {}", self.state);
-        println!("State (Hex):        {}", self.state_hex());
-        println!("Active:             {}", self.is_active);
-        println!("Real-time:          {}", self.realtime_on);
-        println!("Definitions:        {}", self.definitions_updated);
-        
+        { // Scope for WMI Objects
+            /*
+                WARDEN: Understanding WMI Objects and Memory Management
 
-        // Bits decoded
-        println!("\nBit Analysis:");
-        println!("  Bits 12-15 (Active):     0x{:X}", (self.state >> 12) & 0xF);
-        println!("  Bits 12-15 (Running):    0x{:X}", (self.state >> 8) & 0xF);
-        println!("  Bits 0-7   (Definitions):0x{:02X}", self.state & 0xFF);
-        println!();
-    }
+                This scope is meant to be a controlled enviroment for WMI objects
 
-    fn display(&self, index: usize, mode: &DisplayMode) {
-        match mode {
-            DisplayMode::Normal => self.display_normal(index),
-            DisplayMode::Technical => self.display_technical(index),
-        }
-    }
+                1. Problem: Were dealing with 2 serious problems that must be dealt with accordingly:
+                - COM initialization: We must uninitialize COM when done (Look at update module for more info on this)
+                - VARIANT memory management: Windows allocates memory for VARIANT data
 
-    // Helper method to get state as hex
-    fn state_hex(&self) -> String {
-        format!("0x{:06X}", self.state)
-    }
+                2. Issue: When we call 'Get()' on a WMI object, Windows will fill a VARIANT struct and may allocate memory for it's contents. After we extract and use
+                the data, the VARIANT still holds the allocated memory. If we don't free it, we leak memory on EVERY loop iteration. This is bad Mkay
 
-    // Checks to see if product is fully protected
-    fn is_fully_protected(&self) -> bool {
-        self.is_active && self.realtime_on && self.definitions_updated
-    }
-
-}
+                3. Solution: To solve this, we call a method known as 'VariantClear()'. Use this after every variant when your done using it BUT before it goes out
+                of scope. This way it releases any memory Windows allocated. DON'T WAIT UNTIL IT GOES OUT OF SCOPE
+            */
 
 
-pub fn antivirus_software(mode: DisplayMode) -> Result<(), Box<dyn std::error::Error>> {
+            // We first obtain the locator using CoCreateInstance which obtains a pointer
+            let locator: IWbemLocator = CoCreateInstance(&WbemLocator, None, CLSCTX_INPROC_SERVER)?;
 
-    // This connects us to the name space we need for the antivirus query
-    let wmi_con = WMIConnection::with_namespace_path("ROOT\\SecurityCenter2")?;
+            // Then we grab the namespace path which is "ROOT\\SecurityCenter2" in BSTR format
+            let namespace_path = BSTR::from("ROOT\\SecurityCenter2");
 
-    // This allows us to query for certain or all information about the AntiVirusProduct
-    let results: Vec<HashMap<String, Variant>> = wmi_con.raw_query("SELECT * FROM AntiVirusProduct")?;
+            // Now the fun part, We can connect to the namespace on the computer using 'ConnectServer()'
+            // If you want more info on this method: https://learn.microsoft.com/en-us/windows/win32/api/wbemcli/nf-wbemcli-iwbemlocator-connectserver
+            let services = locator.ConnectServer(
+                &namespace_path, // This is the pointer to the specified namespace. This requires a valid BSTR
+                &BSTR::default(), // This is for a user name for the connection, we'll use '&BSTR::default()' as NULL for this pointer. Their might be a "right way" to do this
+                &BSTR::default(), // This is for a password for the connection
+                &BSTR::default(), // This is for local
+                0, // This is for flags. we'll use '0' for this value because it will return the call from 'ConnectServer' only after its established
+                &BSTR::default(), // This can contain the name of the domain of the user to authenticate
+                None // This is usually NULL
+            )?;
 
-    // This checks to see if we have any antivirus on the machine
-    if results.is_empty() {
-        println!("No antivirus products found!");
-        return Ok(());
-    }
+            // This should look familiar to some of you, were basically grabing specific information we need
+            let query = BSTR::from("Select displayName, productState FROM AntiVirusProduct");
 
-    
-    println!("Found {} antivirus product(s): \n", results.len());
-    
-    let products: Vec<AntiVirusProduct> = results
-        .iter()
-        .filter_map(AntiVirusProduct::from_wmi_data)
-        .collect();
+            // This will execute a query to retrieve our objects
+            // For more info on this method: https://learn.microsoft.com/en-us/windows/win32/api/wbemcli/nf-wbemcli-iwbemservices-execquery
+            let enum_object = services.ExecQuery(
+                &BSTR::from("WQL"), // This specifies the query language to use supported by Windows and it MUST be "WQL". Windows says that not me
+                &query, // This is where the query search will go. It cannot be NULL...why are you trying to search for nothing
+                WBEM_FLAG_RETURN_IMMEDIATELY | WBEM_FLAG_FORWARD_ONLY, // This is where flags go and they affect the behavior of this method.
+                None // This is usually NULL
+            )?;
 
-    // Iterate through each antivirus product found
-    for (i, product) in products.iter().enumerate() {
-        product.display(i + 1, &mode);
-    }
 
-    display_summary(&products, &mode);
-    
+            let mut all_products: Vec<ProductInfo> = Vec::new();
+
+
+            loop { // Were just fetching each antivirus product with a loop...there is probably another way to do this but this works
+
+                // The objects var allows us to store each complete antivirus product
+                let mut objects = [None; 1];
+                // This just tells us how many object were returned
+                let mut returned = 0;
+
+                // Now we use the 'Next()' method to fetch one product at a time, the second call will replace the last product with the next one...got it?
+                // For more info on this method: https://learn.microsoft.com/en-us/windows/win32/api/wbemcli/nf-wbemcli-ienumwbemclassobject-next
+                let _ = enum_object.Next(
+                    WBEM_INFINITE, // This specifies the maximum amount of time in milliseconds that the call blocks before returning. Just stole this line from the page
+                    &mut objects, // This should point to a storage to hold the number of IWbemClassObject interface pointers specified by uCount
+                    &mut returned // This receives the number of objects returned.
+                );
+
+                // If there is nothing to look at, why bother
+                if returned == 0 {
+                    break;
+                }
+
+                if let Some(class_object) = &objects[0] {
+
+                    // And because I definitely knew I wanted to put these results in a struct, I made a helper function
+                    // and totaly didn't stick this all in one block
+                    // Were putting the class_object in obj and "displayName" in our name search
+                    let name = string_property(class_object, "displayName")?;
+
+                    // Heres the other one for the product state...same deal as above
+                    let state = integer_property(class_object, "productState")?;
+                    // Reminder: Use "0x{:X} for hexadecimal"
+
+                    let is_active = ((state >> 12) & 0xF) != 0;
+
+                    let is_realtime = ((state >> 12) & 0xF) == 1;
+
+                    let defin_new = (state & 0xFF) == 0x00;
+
+                    let product = ProductInfo {
+                        name: name,
+                        state: state,
+                        is_active: is_active,
+                        is_realtime: is_realtime,
+                        defin_new: defin_new
+                    };
+                    all_products.push(product);
+                    
+                    
+                }
+            } // End of loop
+
+            display_antivirus(&all_products);
+        } // End of scope
+        CoUninitialize();
+    }// End of unsafe block
     Ok(())
-
 }
 
-fn display_summary(products: &[AntiVirusProduct], mode: &DisplayMode) {
-    match mode {
-        DisplayMode::Normal => {
-            let fully_protected = products.iter().filter(|p| p.is_fully_protected()).count();
-            let disabled = products.iter().filter(|p| !p.is_active).count();
-            let partial = products.len() - fully_protected - disabled;
 
-            println!("\n{}", "=".repeat(40));
-            println!("SUMMARY");
-            println!("{}", "=". repeat(40));
-            println!("Total antivirus programs: {}", products.len());
-            println!("Fully protected: {}", fully_protected);
+fn string_property(obj: &IWbemClassObject, name: &str) -> Result<String> {
+    unsafe {
+        // This should create uninitialized memory for a VARIANT struct, with all bytes set to zero
+        // .....I think thats how that works
+        let mut variant = MaybeUninit::<VARIANT>::zeroed();
 
-            if disabled > 0 {
-                println!("Disabled: {}", disabled);
-                println!("  - Enable at least one antivirus");
-            }
+        // Now were gonna fill that memory with the information below
+        // For more info on this method: https://learn.microsoft.com/en-us/windows/win32/api/wbemcli/nf-wbemcli-iwbemclassobject-get
+        obj.Get(
+            &BSTR::from(name), // Name of the property were wanting
+            0, // This must be zero....I don't know why but it does
+            variant.as_mut_ptr(), // When successful, this assignes the correct type and value for the qualifier
+            None, // Were leaving this NULL
+            None // This one will be NULL too
+        )?;
 
-            if partial > 0 {
-                println!("Need attention: {}", partial);
-                println!("Check real-time protection and updates");
-            }
+        // Now I am gonna try to explain this to the best of my ability
+        // The 'assume.init()' is us saying that the memory is now properly initialized...because we %100 know thats right...right?
+        let mut variant = variant.assume_init();
 
-            if fully_protected == products.len() && products.len() > 0 {
-                println!("All antivirus programs are fully protected")
-            }
-        }
+        // VARIANT is a C union wrapped in Rust structs
+        // vt = "variant type" (16-bit integer)
+        // VT_BSTR means this VARIANT contains a BSTR string
+        // The double 'Anonymous' is because of Rusts representation of C unions
+        let result = if variant.Anonymous.Anonymous.vt == VT_BSTR {
+            // The third 'Anonymous' contains all the possible value types like bstrVal, lVal, boolVal, and more
+            let bstr_ptr = &variant.Anonymous.Anonymous.Anonymous.bstrVal;
+            // From here we are basically converting the BSTR string to a Rust String
+            BSTR::from_wide(&bstr_ptr).to_string()
+        } else {
+            "Unknown".to_string()
+        };
 
-        DisplayMode::Technical => {
-            println!("\n{}", "=".repeat(40));
-            println!("TECHNICAL SUMMARY");
-            println!("{}", "=".repeat(40));
-
-            for (i, product) in products.iter().enumerate() {
-                println!("{}. {}:", i + 1, product.name);
-                println!("  State: 0x{:06X} ({})", product.state, product.state);
-                println!("  Fully Protected: {}", product.is_fully_protected());
-                println!();
-            }
-
-            let security_score: f32 = products.iter().map(|p| {
-                    let mut score = 0.0;
-                    if p.is_active {score += 0.4;}
-                    if p.realtime_on {score += 0.3;}
-                    if p.definitions_updated {score += 0.3}
-                    score
-            }).sum::<f32>() / products.len() as f32 * 100.0;
-
-            println!("Overall Security Score: {:.1}%", security_score);
-        }
+        // THIS IS IMPORTANT...PAY ATTENTION
+        // When we are done using our VARIANT we have to dispose of it properly, otherwise we'll have a memory leak
+        // This is because Windows allocated memory for the variant and that will continue to use up memory if not cleared
+        // So we'll use 'VariantClear()' on EACH VARIANT after your done using it and BEFORE it leaves scope
+        VariantClear(&mut variant)?;
+        Ok(result)
     }
 }
 
-pub fn antivirus_check() -> Result<(), Box<dyn std::error::Error>> {
-    antivirus_software(DisplayMode::Normal)
+fn integer_property(obj: &IWbemClassObject, name: &str) -> Result<i32> {
+    unsafe {
+        // This should create uninitialized memory for a VARIANT struct, with all bytes set to zero
+        // .....I think thats how that works
+        let mut variant = MaybeUninit::<VARIANT>::zeroed();
+
+        // Now were gonna fill that memory with the information below
+        // For more info on this method: https://learn.microsoft.com/en-us/windows/win32/api/wbemcli/nf-wbemcli-iwbemclassobject-get
+        obj.Get(
+            &BSTR::from(name), // Name of the property were wanting
+            0, // This must be zero
+            variant.as_mut_ptr(), // When successful, this assignes the correct type and value for the qualifier
+            None, // Were leaving this NULL
+            None // This one will be NULL too
+        )?;
+
+        // The last one worked...so should this one
+        let mut variant = variant.assume_init();
+
+        // Because were grabing an integer were gonna use VT_I4 instead
+        let result = if variant.Anonymous.Anonymous.vt == VT_I4 {
+            // Then we'll use lVal which is used for long/32-bit integers
+            variant.Anonymous.Anonymous.Anonymous.lVal
+        } else {
+            67
+        };
+
+        // CLEAN UP
+        VariantClear(&mut variant)?;
+        Ok(result)
+    }
 }
 
-pub fn antivirus_detailed_check() -> Result<(), Box<dyn std::error::Error>> {
-    antivirus_software(DisplayMode::Technical)
+fn display_antivirus(products: &Vec<ProductInfo>) {
+    println!("\n{} Antivirus Product(s) Available", products.len());
+    println!("{}", "=".repeat(30));
+
+    if products.is_empty() {
+        println!("Found No Antivirus");
+        return;
+    }
+
+    for (i, prod) in products.iter().enumerate() {
+        println!("{}. {}", i + 1, prod.name);
+        println!("  - Is Running: {}", if prod.is_active {"Yes"} else {"No"});
+        println!("  - Real-Time Protection: {}", if prod.is_realtime {"On"} else {"Off"});
+        println!("  - Definitions Up-to-date: {}", if prod.defin_new {"Yes"} else {"No"});
+        println!("  - Product State: 0x{:X}\n", prod.state);
+    }
 }
