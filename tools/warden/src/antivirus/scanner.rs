@@ -116,10 +116,13 @@ pub fn antivirus_wmi_api() -> Result<()> {
                     let state = integer_property(class_object, "productState")?;
                     // Reminder: Use "0x{:X} for hexadecimal"
 
+                    // Now we can look at the hexadecimal number for the product state, when looking at the state, we are looking at three sets of bits
+                    // Just so you have an understanding of what your looking at, Here are the bits placement
+                    // (0xF0000) Acts as the identifier for the product (e.g. 6 = Windows Defender)
+                    // (0x0FF00) Tells us if the product is enabled or disabled (e.g 10 = Windows Defender Enabled or 01 = Windows Defender Disabled)
+                    // (0x000FF) Will show us if our definitions are up to date (e.g 00 = Definitions Up-to-date or 10 = Need updating)
                     let is_active = ((state >> 12) & 0xF) != 0;
-
                     let is_realtime = ((state >> 12) & 0xF) == 1;
-
                     let defin_new = (state & 0xFF) == 0x00;
 
                     let product = ProductInfo {

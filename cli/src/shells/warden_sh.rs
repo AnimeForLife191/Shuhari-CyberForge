@@ -3,6 +3,7 @@ use rustyline::{DefaultEditor, error::ReadlineError};
 
 use warden::antivirus::scanner::{antivirus_wmi_api};
 use warden::updates::scanner::{update_com_api};
+use warden::firewall::scanner::{firewall_com_api};
 
 use crate::banners::warden_banners::warden_home_banner;
 
@@ -30,8 +31,12 @@ pub fn warden_shell(rl: &mut DefaultEditor) {
                         handle_antivirus_command(args);
                     }
 
-                    "updates" => {
+                    "update" => {
                         handle_update_commands(args);
+                    }
+
+                    "firewall" => {
+                        handle_firewall_commands(args);
                     }
 
                     _ => {
@@ -95,7 +100,27 @@ fn handle_update_commands(args: &[&str]) {
         }
 
         _ => {
-            println!("{}", format!("Unkonwn antivirus command: '{}'", args[0]).red());
+            println!("{}", format!("Unkonwn update command: '{}'", args[0]).red());
+        }
+    }
+}
+
+fn handle_firewall_commands(args: &[&str]) {
+    if args.is_empty() {
+        println!("{}", "Usage: update <check>".yellow());
+        return;
+    }
+
+    match args[0].to_lowercase().as_str() {
+        "check" => {
+            println!("{}", "Running Firewall Check".green());
+            if let Err(e) = firewall_com_api() {
+                println!("{}", format!("Error: {}", e).red());
+            }
+        }
+
+        _ => {
+            println!("{}", format!("Unkonwn firewall command: '{}'", args[0]).red());
         }
     }
 }

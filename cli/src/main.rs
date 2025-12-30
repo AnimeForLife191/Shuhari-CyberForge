@@ -70,6 +70,5 @@ fn main() {
                 break;
             }
         }
-        
     }
 }

@@ -12,7 +12,7 @@ struct UpdateSummary {
     update_list: Vec<UpdateInfo>
 }
 
-/// Grabing updates from Windows
+/// Grabing updates for Windows
 pub fn update_com_api() -> Result<()> {
     unsafe { // We use windows unsafe block here because were using foreign functions that are unsafe with Rust
         /*
@@ -80,7 +80,7 @@ pub fn update_com_api() -> Result<()> {
 
                 // See if a title has security in it
                 let is_security = title.to_lowercase().contains("security");
-
+            
                 update_list.push(UpdateInfo { 
                     title, 
                     is_security 
@@ -118,9 +118,9 @@ fn display_updates(summary: &UpdateSummary) {
         .count();
 
     if security_updates == 0 {
-        println!("No Security Updates available");
+        println!("  - No Security Updates available");
     } else {
-        println!("{} Security Updates available", security_updates);
+        println!("  - {} Security Updates available", security_updates);
     }
 
     println!("\nUpdate List: ");
