@@ -182,7 +182,7 @@ fn string_property(obj: &IWbemClassObject, name: &str) -> Result<String> {
         // THIS IS IMPORTANT...PAY ATTENTION
         // When we are done using our VARIANT we have to dispose of it properly, otherwise we'll have a memory leak
         // This is because Windows allocated memory for the variant and that will continue to use up memory if not cleared
-        // So we'll use 'VariantClear()' on EACH VARIANT after your done using it and BEFORE it leaves scope
+        // So we'll use 'VariantClear()' on EACH VARIANT after were done using it and BEFORE it leaves scope
         VariantClear(&mut variant)?;
         Ok(result)
     }
