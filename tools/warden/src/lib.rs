@@ -1,7 +1,6 @@
 mod antivirus;
 mod updates;
 mod firewall;
-
 mod common;
 
 pub use antivirus::scanner::scan_antivirus;
