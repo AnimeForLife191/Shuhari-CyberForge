@@ -25,9 +25,9 @@ pub fn display_antivirus(products: &[ProductInfo], verbose: bool) {
         println!("Product Details:\n"); // For loop to iterate through products
         for (i, prod) in products.iter().enumerate() {
             println!("{}. {}", i + 1, prod.name); // Name of product
-            println!("  - Status: {}", if prod.is_active {"Active"} else {"Inactive"}); // Product is Active or Inactive
-            println!("  - Real-time: {}", if prod.is_realtime {"Enabled"} else {"Disabled"}); // Real-time On or Off
-            println!("  - Definitions: {}\n", if prod.definitions_new {"Up-to-date"} else {"Out-of-date"}); // Diffinitions are up-to-date
+            println!(" - Status: {}", if prod.is_active {"Active"} else {"Inactive"}); // Product is Active or Inactive
+            println!(" - Real-time: {}", if prod.is_realtime {"Enabled"} else {"Disabled"}); // Real-time On or Off
+            println!(" - Definitions: {}\n", if prod.definitions_new {"Up-to-date"} else {"Out-of-date"}); // Diffinitions are up-to-date
         }
     } else { 
         // Verbose Scan
