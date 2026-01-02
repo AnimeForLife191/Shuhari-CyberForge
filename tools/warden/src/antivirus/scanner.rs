@@ -4,16 +4,16 @@ use windows::Win32::System::Wmi::*;
 
 use crate::common::wmi_helpers::{string_property, integer_property};
 
-struct ProductInfo {
-    name: String,
-    state: i32,
-    is_active: bool,
-    is_realtime: bool,
-    defin_new: bool
+pub struct ProductInfo {
+    pub name: String,
+    pub state: i32,
+    pub is_active: bool,
+    pub is_realtime: bool,
+    pub definitions_new: bool
 }
 
 /// Grabing antivirus for Windows
-pub fn scan_antivirus() -> Result<()> {
+pub fn scan_antivirus() -> Result<Vec<ProductInfo>> {
     // NOTE: Instead of making one big safe block, we could only use them when needed but for now this was easier to learn with
     unsafe { // We use windows unsafe block here because were using foreign functions that are unsafe with Rust
         /*
@@ -34,6 +34,9 @@ pub fn scan_antivirus() -> Result<()> {
             println!("Error with COM initilaization in Antivirus module");
             return Err(_com.into());
         }
+
+        // Vec for antivirus products
+        let mut all_products: Vec<ProductInfo> = Vec::new();
 
         { // Scope for WMI Objects
             /*
@@ -85,10 +88,6 @@ pub fn scan_antivirus() -> Result<()> {
                 None // This is usually NULL
             )?;
 
-            // Vec for products
-            let mut all_products: Vec<ProductInfo> = Vec::new();
-
-
             loop { // Were just fetching each antivirus product with a loop...there is probably another way to do this but this works
 
                 // The objects var allows us to store each complete antivirus product
@@ -121,15 +120,29 @@ pub fn scan_antivirus() -> Result<()> {
                     let state = integer_property(class_object, "productState")?;
                     // Reminder: Use "0x{:X} for hexadecimal"
 
-                    // Now we can look at the hexadecimal number for the product state, when looking at the state, we are looking at three sets of bits
-                    // Just so you have an understanding of what your looking at, Here are the bits placement
-                    // (0xF0000) Acts as the identifier for the product (e.g. 6 = Windows Defender)
-                    // (0x0FF00) Tells us if the product is enabled or disabled (e.g 10 = Windows Defender Enabled or 01 = Windows Defender Disabled)
-                    // (0x000FF) Will show us if our definitions are up to date (e.g 00 = Definitions Up-to-date or 10 = Need updating)
+                    /*
+                        WARDEN: BIT LOGIC
+
+                        Their are many different Antivirus products out their and all keep the same bit logic for two bits...I think. 
+                        (0xFF000): The (0xF0) represents the product ID while (0x0F) represents weather the product is enabled or disabled.
+                        For example here is a Third party antivirus:
+                        (0x40) = Disabled
+                        (0x41) = Enabled
+                        (0x42) = Realtime protection off but antivirus active
+                        and with Windows Defender:
+                        (0x60) = Disabled
+                        (0x61) = Enabled
+                        (0x62) = Realtime protection off but antivirus active
+                        I want to point out I am not a professional at this, I am still learning how this works and for all I know
+                        this could be the wrong way to explain it and for that I'm sorry. But this is how I think it works.
+                    */
                     let is_active = ((state >> 12) & 0xF) != 0;
                     let is_realtime = ((state >> 12) & 0xF) == 1;
-                    let defin_new = (state & 0xFF) == 0x00;
-                    // NOTE: This can be improved by A LOT, it works.....some how but needs to be reworked
+                    // For this were looking at (0x600FF) to see if definitions are up-to-date
+                    let definitions_new = (state & 0xFF) == 0x00;
+                    // I feel like this is confusing for a lot of people and I can see why if it is. Any decent information I found
+                    // on how this works was still confusing, so hopefully this can be solved and explained more clearly in the future
+                    // as SysDefense grows.
 
                     // Pushing information to struct
                     let product = ProductInfo {
@@ -137,35 +150,15 @@ pub fn scan_antivirus() -> Result<()> {
                         state: state,
                         is_active: is_active,
                         is_realtime: is_realtime,
-                        defin_new: defin_new
+                        definitions_new: definitions_new
                     };
                     all_products.push(product);
                     
                     
                 }
             } // End of loop
-
-            display_antivirus(&all_products);
         } // End of scope
         CoUninitialize();
+        Ok(all_products)
     }// End of unsafe block
-    Ok(())
-}
-
-fn display_antivirus(products: &Vec<ProductInfo>) {
-    println!("\n{} Antivirus Product(s) Available", products.len());
-    println!("{}", "=".repeat(30));
-
-    if products.is_empty() {
-        println!("Found No Antivirus");
-        return;
-    }
-
-    for (i, prod) in products.iter().enumerate() {
-        println!("{}. {}", i + 1, prod.name);
-        println!("  - Is Running: {}", if prod.is_active {"Yes"} else {"No"});
-        println!("  - Real-Time Protection: {}", if prod.is_realtime {"On"} else {"Off"});
-        println!("  - Definitions Up-to-date: {}", if prod.defin_new {"Yes"} else {"No"});
-        println!("  - Product State: 0x{:X}\n", prod.state);
-    }
 }

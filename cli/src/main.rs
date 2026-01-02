@@ -1,11 +1,15 @@
 use clap::{Parser, Subcommand};
 
 use warden::{scan_antivirus, scan_updates, scan_firewall};
+use warden::display_antivirus;
 
 #[derive(Parser)]
 struct Cli {
     #[command(subcommand)]
-    command: Command
+    command: Command,
+
+    #[arg(short, long, global = true)]
+    verbose: bool
 }
 
 // This is where tools can be added to the CLI and be given subcommands
@@ -28,7 +32,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     match cli.command {
         Command::Warden(wcmd) => match wcmd {
-            WardenCommand::Antivirus => scan_antivirus()?,
+            WardenCommand::Antivirus => display_antivirus(&scan_antivirus()?, cli.verbose),
             WardenCommand::Updates => scan_updates()?,
             WardenCommand::Firewall => scan_firewall()?
         }
