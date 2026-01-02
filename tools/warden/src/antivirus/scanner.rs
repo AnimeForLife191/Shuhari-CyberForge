@@ -142,7 +142,8 @@ pub fn scan_antivirus() -> Result<Vec<ProductInfo>> {
                     let definitions_new = (state & 0xFF) == 0x00;
                     // I feel like this is confusing for a lot of people and I can see why if it is. Any decent information I found
                     // on how this works was still confusing, so hopefully this can be solved and explained more clearly in the future
-                    // as SysDefense grows.
+                    // as SysDefense grows. As for now, I'll use https://stackoverflow.com/questions/4700897/wmi-security-center-productstate-clarification
+                    // for information gathering on understanding the bit logic
 
                     // Pushing information to struct
                     let product = ProductInfo {
