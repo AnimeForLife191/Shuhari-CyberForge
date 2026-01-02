@@ -13,8 +13,8 @@ struct ProductInfo {
 }
 
 /// Grabing antivirus for Windows
-pub fn antivirus_wmi_api() -> Result<()> {
-    // NOTE: Instead of making one big safe block, we could only use them when needed
+pub fn scan_antivirus() -> Result<()> {
+    // NOTE: Instead of making one big safe block, we could only use them when needed but for now this was easier to learn with
     unsafe { // We use windows unsafe block here because were using foreign functions that are unsafe with Rust
         /*
             WARDEN: COM Apartments
@@ -30,8 +30,9 @@ pub fn antivirus_wmi_api() -> Result<()> {
         */
 
         let _com = CoInitializeEx(None, COINIT_MULTITHREADED);
-        if _com.is_err() { 
-            return Err(_com.into()); // Error Check
+        if _com.is_err() { // Error Handling
+            println!("Error with COM initilaization in Antivirus module");
+            return Err(_com.into());
         }
 
         { // Scope for WMI Objects
@@ -41,11 +42,11 @@ pub fn antivirus_wmi_api() -> Result<()> {
                 This scope is meant to be a controlled enviroment for WMI objects
 
                 1. Problem: Were dealing with 2 serious problems that must be dealt with accordingly:
-                - COM initialization: We must uninitialize COM when done (Look at update module for more info on this)
+                - COM initialization: We must uninitialize COM when done (Look at Update module for more info on this)
                 - VARIANT memory management: Windows allocates memory for VARIANT data
 
                 2. Issue: When we call 'Get()' on a WMI object, Windows will fill a VARIANT struct and may allocate memory for it's contents. After we extract and use
-                the data, the VARIANT still holds the allocated memory. If we don't free it, we leak memory on EVERY loop iteration. This is bad Mkay
+                the data, the VARIANT still holds the allocated memory. If we don't free it, we leak memory on EVERY loop iteration. This is very bad Mkay
 
                 3. Solution: To solve this, we call a method known as 'VariantClear()'. Use this after every variant when your done using it BUT before it goes out
                 of scope. This way it releases any memory Windows allocated. DON'T WAIT UNTIL IT GOES OUT OF SCOPE
@@ -54,6 +55,8 @@ pub fn antivirus_wmi_api() -> Result<()> {
 
             // We first obtain the locator using CoCreateInstance which obtains a pointer
             let locator: IWbemLocator = CoCreateInstance(&WbemLocator, None, CLSCTX_INPROC_SERVER)?;
+            // Why do we use 'CLSCTX_INPROC_SERVER' here?
+            // For information on CLSCTX: https://learn.microsoft.com/en-us/windows/win32/api/wtypesbase/ne-wtypesbase-clsctx
 
             // Then we grab the namespace path which is "ROOT\\SecurityCenter2" in BSTR format
             let namespace_path = BSTR::from("ROOT\\SecurityCenter2");
@@ -82,7 +85,7 @@ pub fn antivirus_wmi_api() -> Result<()> {
                 None // This is usually NULL
             )?;
 
-
+            // Vec for products
             let mut all_products: Vec<ProductInfo> = Vec::new();
 
 
@@ -96,7 +99,7 @@ pub fn antivirus_wmi_api() -> Result<()> {
                 // Now we use the 'Next()' method to fetch one product at a time, the second call will replace the last product with the next one...got it?
                 // For more info on this method: https://learn.microsoft.com/en-us/windows/win32/api/wbemcli/nf-wbemcli-ienumwbemclassobject-next
                 let _ = enum_object.Next(
-                    WBEM_INFINITE, // This specifies the maximum amount of time in milliseconds that the call blocks before returning. Just stole this line from the page
+                    WBEM_INFINITE, // This specifies the maximum amount of time in milliseconds that the call blocks before returning. I stole this line from the page
                     &mut objects, // This should point to a storage to hold the number of IWbemClassObject interface pointers specified by uCount
                     &mut returned // This receives the number of objects returned.
                 );
@@ -106,11 +109,12 @@ pub fn antivirus_wmi_api() -> Result<()> {
                     break;
                 }
 
+                // Lets go through the objects now if any and see what we get
                 if let Some(class_object) = &objects[0] {
 
-                    // And because I definitely knew I wanted to put these results in a struct, I made a helper function
-                    // and totaly didn't stick this all in one block
-                    // Were putting the class_object in obj and "displayName" in our name search
+                    // Now we need to convert our Windows information to be usable in Rust
+                    // In 'common/wmi_helpers.rs' you'll find these functions
+                    // Were putting class_object in obj and "displayName" in our name search
                     let name = string_property(class_object, "displayName")?;
 
                     // Heres the other one for the product state...same deal as above
@@ -125,7 +129,9 @@ pub fn antivirus_wmi_api() -> Result<()> {
                     let is_active = ((state >> 12) & 0xF) != 0;
                     let is_realtime = ((state >> 12) & 0xF) == 1;
                     let defin_new = (state & 0xFF) == 0x00;
+                    // NOTE: This can be improved by A LOT, it works.....some how but needs to be reworked
 
+                    // Pushing information to struct
                     let product = ProductInfo {
                         name: name,
                         state: state,

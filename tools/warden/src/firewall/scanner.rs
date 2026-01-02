@@ -1,10 +1,10 @@
 use windows::core::*;
 use windows::Win32::Foundation::*;
-use windows::Win32::System::Variant::*;
 use windows::Win32::System::Com::*;
 use windows::Win32::System::Wmi::*;
 use windows::Win32::NetworkManagement::WindowsFirewall::*;
-use std::mem::MaybeUninit;
+
+use crate::common::wmi_helpers::{string_property, integer_property};
 
 struct WindowsFirewallProfile {
     public: bool,
@@ -19,31 +19,27 @@ struct FirewallProductInfo {
 }
 
 /// Grabing firewall for Windows
-pub fn firewall_com_api() -> Result<()> {
+pub fn scan_firewall() -> Result<()> {
+    /* 
+        WARDEN - Firewall Module
+
+        This module is closely similar to the Antivirus Module. So similar that I copied the logic of the antivirus product and changed a single argument.
+        The Firewall module is also one of the easiest to make and understand with all you needing is a few lines of code to make it work.
+    */
     unsafe {
-        /* 
-            WARDEN - Firewall Module
 
-            This module is closely similar to the Antivirus Module. So similar that I copied the logic of the antivirus product and changed a single argument.
-            The Firewall module is also one of the easiest to make and understand with all you needing is a few lines of code to make it work.
-
-            Here is how it works:
-        */
-
-        // 1. We must initialize a thread
-        let _com = CoInitializeEx(None, COINIT_MULTITHREADED);
+        let _com: HRESULT = CoInitializeEx(None, COINIT_MULTITHREADED);
         if _com.is_err() {
+            println!("Error with COM initilaization in Firewall module");
             return Err(_com.into());
         }
 
-        // This vector is for the profiles of public, private, and domain. Do we need a Vec for this, no...but it works
-        let mut firewall_profiles: Vec<WindowsFirewallProfile> = Vec::new();
-
         {
-            // 2. We gain access to the firewall policy
+            // We have to connect to the INetFwPolicy interface
+            // for more info on 'INetFwPolicy2': https://learn.microsoft.com/en-us/windows/win32/api/netfw/nn-netfw-inetfwpolicy2
             let policy: INetFwPolicy2 = CoCreateInstance(&NetFwPolicy2, None, CLSCTX_ALL)?;
 
-            // 3. Now we can get a profile status for the profiles
+            // And just like that we are allowed access into the firewall policy
             let public_fw = {
                 // We first use the 'get_FirewallEnabled' method with the profiletype we want as an arg
                 let firewall = policy.get_FirewallEnabled(NET_FW_PROFILE2_PUBLIC)?;
@@ -54,7 +50,8 @@ pub fn firewall_com_api() -> Result<()> {
 
             // And Thats it, now you can see the status of different profiles types
             // NOTE: This seems to only grab information of Windows Defenders Profiles, Not a third party Firewall
-            // for example, you can turn off the Windows Defender firewall but a third party software will still have their firewall active
+            // for example, you can turn off the Windows Defender firewall and it will show off on the checks
+            // but a third party software will still have their firewall active.
 
             let private_fw = {
                 let firewall = policy.get_FirewallEnabled(NET_FW_PROFILE2_PRIVATE)?;
@@ -72,8 +69,7 @@ pub fn firewall_com_api() -> Result<()> {
                 domain: domain_fw
             };
 
-            firewall_profiles.push(firewalls);
-            // Now if you want to grab the name of the different Firewall Products you have like the antivirus, we can reuse our Antivirus code here
+            // Now if you want to grab the name of the different Firewall Products you have like the Antivirus module, we can reuse our Antivirus code here
             // logic from antivirus module
             let locator: IWbemLocator = CoCreateInstance(&WbemLocator, None, CLSCTX_INPROC_SERVER)?;
             let namespace_path = BSTR::from("ROOT\\SecurityCenter2");
@@ -110,8 +106,11 @@ pub fn firewall_com_api() -> Result<()> {
                 }
 
                 if let Some(class_object) = &objects[0] {
+                    // Check out common/wmi_helpers.rs to see how these functions work
                     let fw_name = string_property(class_object, "displayName")?;
                     let fw_state = integer_property(class_object, "productState")?;
+
+                    // The firewall product also uses hexadecimal so we can decipher information like the Antivirus module
                     let fw_active = ((fw_state >> 12) & 0xF) != 0;
 
                     let product = FirewallProductInfo {
@@ -123,14 +122,14 @@ pub fn firewall_com_api() -> Result<()> {
                     firewall_products.push(product);
                 }
             }
-            display_firewall(&firewall_profiles, &firewall_products);
+            display_firewall(firewalls, &firewall_products);
         }
         CoUninitialize();
     }
     Ok(())
 }
 
-fn display_firewall(firewall: &Vec<WindowsFirewallProfile>, firewall_product: &Vec<FirewallProductInfo>) {
+fn display_firewall(firewall: WindowsFirewallProfile, firewall_product: &Vec<FirewallProductInfo>) {
         println!("\n{} Firewall Product(s) Available:", firewall_product.len());
         println!("{}", "=".repeat(30));
         if firewall_product.is_empty() {
@@ -144,85 +143,8 @@ fn display_firewall(firewall: &Vec<WindowsFirewallProfile>, firewall_product: &V
             }
         }
     
-
-    for profile in firewall.iter() {
-        println!("Public Firewall {}", if profile.public {"On"} else {"Off"});
-        println!("Private Firewall {}", if profile.private {"On"} else {"Off"});
-        println!("Domain Firewall {}\n", if profile.domain {"On"} else {"Off"});
-    }
-}
-
-fn string_property(obj: &IWbemClassObject, name: &str) -> Result<String> {
-    unsafe {
-        // This should create uninitialized memory for a VARIANT struct, with all bytes set to zero
-        // .....I think thats how that works
-        let mut variant = MaybeUninit::<VARIANT>::zeroed();
-
-        // Now were gonna fill that memory with the information below
-        // For more info on this method: https://learn.microsoft.com/en-us/windows/win32/api/wbemcli/nf-wbemcli-iwbemclassobject-get
-        obj.Get(
-            &BSTR::from(name), // Name of the property were wanting
-            0, // This must be zero....I don't know why but it does
-            variant.as_mut_ptr(), // When successful, this assignes the correct type and value for the qualifier
-            None, // Were leaving this NULL
-            None // This one will be NULL too
-        )?;
-
-        // Now I am gonna try to explain this to the best of my ability
-        // The 'assume.init()' is us saying that the memory is now properly initialized...because we %100 know thats right...right?
-        let mut variant = variant.assume_init();
-
-        // VARIANT is a C union wrapped in Rust structs
-        // vt = "variant type" (16-bit integer)
-        // VT_BSTR means this VARIANT contains a BSTR string
-        // The double 'Anonymous' is because of Rusts representation of C unions
-        let result = if variant.Anonymous.Anonymous.vt == VT_BSTR {
-            // The third 'Anonymous' contains all the possible value types like bstrVal, lVal, boolVal, and more
-            let bstr_ptr = &variant.Anonymous.Anonymous.Anonymous.bstrVal;
-            // From here we are basically converting the BSTR string to a Rust String
-            BSTR::from_wide(&bstr_ptr).to_string()
-        } else {
-            "Unknown".to_string()
-        };
-
-        // THIS IS IMPORTANT...PAY ATTENTION
-        // When we are done using our VARIANT we have to dispose of it properly, otherwise we'll have a memory leak
-        // This is because Windows allocated memory for the variant and that will continue to use up memory if not cleared
-        // So we'll use 'VariantClear()' on EACH VARIANT after your done using it and BEFORE it leaves scope
-        VariantClear(&mut variant)?;
-        Ok(result)
-    }
-}
-
-fn integer_property(obj: &IWbemClassObject, name: &str) -> Result<i32> {
-    unsafe {
-        // This should create uninitialized memory for a VARIANT struct, with all bytes set to zero
-        // .....I think thats how that works
-        let mut variant = MaybeUninit::<VARIANT>::zeroed();
-
-        // Now were gonna fill that memory with the information below
-        // For more info on this method: https://learn.microsoft.com/en-us/windows/win32/api/wbemcli/nf-wbemcli-iwbemclassobject-get
-        obj.Get(
-            &BSTR::from(name), // Name of the property were wanting
-            0, // This must be zero
-            variant.as_mut_ptr(), // When successful, this assignes the correct type and value for the qualifier
-            None, // Were leaving this NULL
-            None // This one will be NULL too
-        )?;
-
-        // The last one worked...so should this one
-        let mut variant = variant.assume_init();
-
-        // Because were grabing an integer were gonna use VT_I4 instead
-        let result = if variant.Anonymous.Anonymous.vt == VT_I4 {
-            // Then we'll use lVal which is used for long/32-bit integers
-            variant.Anonymous.Anonymous.Anonymous.lVal
-        } else {
-            67
-        };
-
-        // CLEAN UP
-        VariantClear(&mut variant)?;
-        Ok(result)
-    }
+        println!("Public Firewall {}", if firewall.public {"On"} else {"Off"});
+        println!("Private Firewall {}", if firewall.private {"On"} else {"Off"});
+        println!("Domain Firewall {}\n", if firewall.domain {"On"} else {"Off"});
+    
 }

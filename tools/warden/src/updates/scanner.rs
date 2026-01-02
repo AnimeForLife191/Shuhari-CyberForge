@@ -13,23 +13,17 @@ struct UpdateSummary {
 }
 
 /// Grabing updates for Windows
-pub fn update_com_api() -> Result<()> {
-    unsafe { // We use windows unsafe block here because were using foreign functions that are unsafe with Rust
-        /*
-            WARDEN: COM Aparments
+pub fn scan_updates() -> Result<()> {
+    /*
+        WARDEN: If you haven't already, please go look at the Antivirus module then come back here
 
-            As you see we are using 'CoInitializeEx(None, COINIT_MULTITHREADED)'. This initializes:
-            - MTA (Multi-Threaded Apartment): Objects can move between threads
-            - Alternative: STA (Single-Threaded) with 'CoInitialize(None)'
+        Even though this module is more lighter then the Antivirus module, it's still holds key information about COM clean up
+    */
+    unsafe {
 
-            Why use MTA for WARDEN, well why not....WARDEN might use threads later so trying to learn it now is better.
-            Its also more flexible for system tools.
-
-            The trade off of using MTA is the cleanup
-        */
-        let _com: HRESULT = CoInitializeEx(None, COINIT_MULTITHREADED); // initializing COM thread
+        let _com: HRESULT = CoInitializeEx(None, COINIT_MULTITHREADED);
         if _com.is_err() { 
-            println!("COM failed to initialize");
+            println!("Error with COM initilaization in Update module");
             return Err(_com.into()); // Error Check    
         }
 
@@ -53,19 +47,30 @@ pub fn update_com_api() -> Result<()> {
             */
 
             // Connect to Windows Update Service
+            // for more info on IUpdateSession: https://learn.microsoft.com/en-us/windows/win32/api/wuapi/nn-wuapi-iupdatesession
             let session: IUpdateSession = CoCreateInstance(&UpdateSession, None, CLSCTX_ALL)?;
+            // Why do we use 'CLSCTX_ALL' here?
 
-            // Get search interface to search updates
-            let searcher = session.CreateUpdateSearcher()?;
+            // To search for updates we need to create an instance for our search
+            // for more info on 'IUpdateSearcher': https://learn.microsoft.com/en-us/windows/win32/api/wuapi/nn-wuapi-iupdatesearcher
+            // for more info on 'CreateUpdateSearcher': https://learn.microsoft.com/en-us/windows/win32/api/wuapi/nf-wuapi-iupdatesession-createupdatesearcher
+            let searcher: IUpdateSearcher = session.CreateUpdateSearcher()?;
 
-            // The search criteria: "IsInstalled=0" tells the search to find pending updates
+            // Our search criteria for this is: "IsInstalled=0". This tells the search to find pending updates
             let search_criteria = BSTR::from("IsInstalled=0");
 
-            // Executing the search and getting a collection
+            // We then use the 'Search' method with our criteria. This allows us to search for updates...if that wasn't obvious
+            // for more info on 'Search': https://learn.microsoft.com/en-us/windows/win32/api/wuapi/nf-wuapi-iupdatesearcher-search
             let data = searcher.Search(&search_criteria)?;
+
+            // Now we can get our updates from the search
+            // for more info on 'Updates': https://learn.microsoft.com/en-us/windows/win32/api/wuapi/nf-wuapi-isearchresult-get_updates
+            // NOTE: There is not a lot on this page, but I wanted to add it just in case
             let updates = data.Updates()?;
 
-            // Counting the updates pending
+            // We will be able to count how many updates we have in our collection using the 'Count' method
+            // Their are multiple different methods to use with 'IUpdateCollection'
+            // for more info on 'IUpdateCollection': https://learn.microsoft.com/en-us/windows/win32/api/wuapi/nn-wuapi-iupdatecollection
             let count = updates.Count()?;
 
             // Process each update in the collection
@@ -95,7 +100,16 @@ pub fn update_com_api() -> Result<()> {
             
             // Remove the '//' below to see what happens
             // CoUninitialize();
+
         } // End of Scope
+
+        // Here is the the cleaning part of COM, when we use COM objects like 'IUpdateSession', 'IUpdateSearcher', 'ISearchResult' or 'IUpdateCollection'
+        // we need to clean them up so we can uninitialize the thread. Now Rust will do this on its own but theirs a slight problem with that.
+        // If Rust destroys them after being used, Windows will also want to destroy them before closing the thread. This cuases issues and we can't
+        // close the thread properly. There are two ways I have found to deal with this:
+        //     1. You can use a method called 'drop()', this will drop the specified object but if you have multiple objects it can become messy        
+        //     2. The option we're using is a scope. The COM objects will be dropped instead of destroyed after going out of scope.
+        // If you want to try yourself, comment the 'CoUninitialize()' below and uncomment the one in the scope
         CoUninitialize();
     }// End of unsafe block
     Ok(())
@@ -106,7 +120,7 @@ fn display_updates(summary: &UpdateSummary) {
     println!("{}", "=".repeat(30));
 
     if summary.total_count == 0 {
-        println!("Your up-to-date");
+        println!("You're up-to-date");
         return;
     } else {
         println!("You have {} Update(s) pending", summary.total_count);

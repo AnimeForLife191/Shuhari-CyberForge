@@ -46,14 +46,11 @@ pub fn string_property(obj: &IWbemClassObject, name: &str) -> Result<String> {
     }
 }
 
+/// Converting vt to a Rust Integer
 pub fn integer_property(obj: &IWbemClassObject, name: &str) -> Result<i32> {
+    // This is the same as 'string property' with a few changes to how we convert
     unsafe {
-        // This should create uninitialized memory for a VARIANT struct, with all bytes set to zero
-        // .....I think thats how that works
         let mut variant = MaybeUninit::<VARIANT>::zeroed();
-
-        // Now were gonna fill that memory with the information below
-        // For more info on this method: https://learn.microsoft.com/en-us/windows/win32/api/wbemcli/nf-wbemcli-iwbemclassobject-get
         obj.Get(
             &BSTR::from(name), // Name of the property were wanting
             0, // This must be zero
@@ -70,7 +67,7 @@ pub fn integer_property(obj: &IWbemClassObject, name: &str) -> Result<i32> {
             // Then we'll use lVal which is used for long/32-bit integers
             variant.Anonymous.Anonymous.Anonymous.lVal
         } else {
-            67
+            -1
         };
 
         // CLEAN UP

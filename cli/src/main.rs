@@ -1,74 +1,37 @@
-use rustyline::error::ReadlineError;
-use rustyline::DefaultEditor;
-use colored::*;
+use clap::{Parser, Subcommand};
 
-mod banners;
-mod shells;
+use warden::{scan_antivirus, scan_updates, scan_firewall};
 
-use crate::banners::general_banners::home_banner;
-use crate::shells::warden_sh::warden_shell;
+#[derive(Parser)]
+struct Cli {
+    #[command(subcommand)]
+    command: Command
+}
 
+// This is where tools can be added to the CLI and be given subcommands
+#[derive(Subcommand)]
+enum Command {
+    #[command(subcommand)]
+    Warden(WardenCommand) // WARDEN tool
+}
 
-fn main() {
-    home_banner();
+// This is the subcommands for WARDEN
+#[derive(Subcommand)]
+enum WardenCommand {
+    Antivirus, // WARDEN antivirus subcommand
+    Updates, // WARDEN updates subcommand
+    Firewall // WARDEN firewall subcommand
+}
 
-    // Readline editor for input
-    let mut rl = DefaultEditor::new().expect("Failed to create readline editor");
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let cli = Cli::parse();
 
-    // Shell loop
-    loop {
-        // readline for home
-        let readline = rl.readline("sysdefense> ");
-
-        match readline {
-            Ok(line) => {
-
-                // Add line to history to recall it
-                let _ = rl.add_history_entry(line.as_str());
-                // Trims the whitespace and converts to lowercase
-                let input = line.trim();
-
-                if input.is_empty() {
-                    continue;
-                }
-
-                match input.to_lowercase().as_str() {
-
-                    // Transfers to WARDEN's shell
-                    "warden" => {
-                        println!("{}", "Entering WARDEN tool...".green());
-                        warden_shell(&mut rl);
-                    }
-                    
-                    // Exits the software
-                    "exit" | "quit" => {
-                        println!("{}", "Goodbye!".cyan());
-                    }
-
-                    // Shows commands
-                    "help" => {
-                        //print_main_help();
-                    }
-
-                    // Error handling for when theirs no responding command
-                    _ => {
-                        println!("{}", format!("Unknown tool: '{}'. Type 'help' for available tools", input).red());
-                    }                    
-                }
-            }
-            Err(ReadlineError::Interrupted) => {
-                // When pressing Ctrl+C
-                println!("{}", "Use 'exit' to quit".yellow());
-            }
-            Err(ReadlineError::Eof) => {
-                // Ctrl+D
-                println!("{}", "Goodbye!".cyan());
-                break;
-            }
-            Err(err) => {
-                println!("{}", format!("Error: {:?}", err).red());
-                break;
-            }
+    match cli.command {
+        Command::Warden(wcmd) => match wcmd {
+            WardenCommand::Antivirus => scan_antivirus()?,
+            WardenCommand::Updates => scan_updates()?,
+            WardenCommand::Firewall => scan_firewall()?
         }
     }
+    Ok(())
 }
