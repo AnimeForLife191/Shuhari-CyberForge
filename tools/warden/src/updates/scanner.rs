@@ -46,6 +46,7 @@ pub fn scan_updates() -> Result<()> {
             4. Test: Uncomment the CoUninitialize() inside the end of this scope and see for yourself   
             */
 
+            println!("\nConnecting to Windows Update Service..."); // This shows us that were connecting to the Windows Update Service
             // Connect to Windows Update Service
             // for more info on IUpdateSession: https://learn.microsoft.com/en-us/windows/win32/api/wuapi/nn-wuapi-iupdatesession
             let session: IUpdateSession = CoCreateInstance(&UpdateSession, None, CLSCTX_ALL)?;
@@ -56,6 +57,7 @@ pub fn scan_updates() -> Result<()> {
             // for more info on 'CreateUpdateSearcher': https://learn.microsoft.com/en-us/windows/win32/api/wuapi/nf-wuapi-iupdatesession-createupdatesearcher
             let searcher: IUpdateSearcher = session.CreateUpdateSearcher()?;
 
+            println!("Checking for updates (This may take 10-30 seconds)..."); // Gives the user an estimate on how long it might take...because looking at nothing is boring
             // Our search criteria for this is: "IsInstalled=0". This tells the search to find pending updates
             let search_criteria = BSTR::from("IsInstalled=0");
 
