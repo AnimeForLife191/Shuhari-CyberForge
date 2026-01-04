@@ -1,7 +1,14 @@
 use clap::{Parser, Subcommand};
 
-use warden::{scan_antivirus, scan_updates, scan_firewall};
-use warden::display_antivirus;
+use warden::{
+    scan_antivirus, 
+    scan_updates, 
+    scan_firewall
+};
+use warden::{
+    display_antivirus, 
+    display_updates
+};
 
 #[derive(Parser)]
 struct Cli {
@@ -33,7 +40,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     match cli.command {
         Command::Warden(wcmd) => match wcmd {
             WardenCommand::Antivirus => display_antivirus(&scan_antivirus()?, cli.verbose),
-            WardenCommand::Updates => scan_updates()?,
+            WardenCommand::Updates => display_updates(scan_updates()?, cli.verbose),
             WardenCommand::Firewall => scan_firewall()?
         }
     }

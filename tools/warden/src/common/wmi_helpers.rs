@@ -2,6 +2,7 @@ use std::mem::MaybeUninit;
 use windows::core::*;
 use windows::Win32::System::Variant::*;
 use windows::Win32::System::Wmi::*;
+use windows::Win32::Foundation::*;
 
 /// Converting BSTR to a Rust String
 pub fn string_property(obj: &IWbemClassObject, name: &str) -> Result<String> {
@@ -74,4 +75,8 @@ pub fn integer_property(obj: &IWbemClassObject, name: &str) -> Result<i32> {
         VariantClear(&mut variant)?;
         Ok(result)
     }
+}
+
+pub fn decimal_to_u64(decimal: DECIMAL) -> u128 {
+    unsafe {((decimal.Hi32 as u128) << 64) | (decimal.Anonymous2.Lo64 as u128)}
 }
