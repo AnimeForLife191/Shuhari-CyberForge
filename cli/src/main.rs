@@ -7,7 +7,8 @@ use warden::{
 };
 use warden::{
     display_antivirus, 
-    display_updates
+    display_updates,
+    display_firewalls
 };
 
 #[derive(Parser)]
@@ -41,7 +42,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Command::Warden(wcmd) => match wcmd {
             WardenCommand::Antivirus => display_antivirus(&scan_antivirus()?, cli.verbose),
             WardenCommand::Updates => display_updates(scan_updates()?, cli.verbose),
-            WardenCommand::Firewall => scan_firewall()?
+            WardenCommand::Firewall => display_firewalls(scan_firewall()?, cli.verbose),
         }
     }
     Ok(())

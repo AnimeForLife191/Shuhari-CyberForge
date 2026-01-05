@@ -10,4 +10,7 @@ pub use antivirus::{
 pub use updates::{
     scanner::scan_updates,
     display::display_updates};
-pub use firewall::scanner::scan_firewall;
+pub use firewall::{
+    scanner::scan_firewall,
+    display::display_firewalls
+};

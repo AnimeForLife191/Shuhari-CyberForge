@@ -34,7 +34,7 @@ pub fn display_antivirus(products: &[ProductInfo], verbose: bool) {
         println!("Scan Details:"); 
         println!(" - Scan Started: {:02}:{:02}:{:02} UTC", get_time().0, get_time().1, get_time().2); // NOTE: 0 is hours, 1 is minutes, 2 is seconds
         println!(" - WMI Namespace: ROOT\\SecurityCenter2"); // Namespaced used
-        println!(" - Query: SELECT displayName, productState FROM AntiVirusProduct\n"); // Query used
+        println!(" - Query: Select displayName, productState FROM AntiVirusProduct\n"); // Query used
 
         println!("Summary:");
         println!(" - Products Found: {}", products.len());
@@ -51,8 +51,9 @@ pub fn display_antivirus(products: &[ProductInfo], verbose: bool) {
             println!(" - Status: {}", if prod.is_active {"Active"} else {"Inactive"});
             println!(" - Real-time: {}", if prod.is_realtime {"Enabled"} else {"Disabled"});
             println!(" - Definitions: {}", if prod.definitions_new {"Up-to-date"} else {"Out-of-date"});
-            println!(" - Raw State: {}", prod.state); // Raw state of product
-            println!(" - Hexadecimal State: 0x{:X}\n", prod.state); // Hexadecimal of product
+            println!(" - Product Hexadecimal State: 0x{:X}", prod.state); // Hexadecimal of product
+            println!(" - Product Raw State: {}", prod.state); // Raw state of product
+            println!();
         }
 
         println!("Technical Information:");

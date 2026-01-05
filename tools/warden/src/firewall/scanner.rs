@@ -6,20 +6,20 @@ use windows::Win32::NetworkManagement::WindowsFirewall::*;
 
 use crate::common::wmi_helpers::{string_property, integer_property};
 
-struct WindowsFirewallProfile {
-    public: bool,
-    private: bool,
-    domain: bool
+pub struct WindowsFirewallProfile {
+    pub public: bool,
+    pub private: bool,
+    pub domain: bool
 }
 
-struct FirewallProductInfo {
-    name: String,
-    state: i32,
-    is_active: bool
+pub struct FirewallProductInfo {
+    pub name: String,
+    pub state: i32,
+    pub is_active: bool
 }
 
 /// Grabing firewall for Windows
-pub fn scan_firewall() -> Result<()> {
+pub fn scan_firewall() -> Result<(WindowsFirewallProfile, Vec<FirewallProductInfo>)> {
     /* 
         WARDEN - Firewall Module
 
@@ -33,6 +33,9 @@ pub fn scan_firewall() -> Result<()> {
             println!("Error with COM initilaization in Firewall module");
             return Err(_com.into());
         }
+
+        let firewalls: WindowsFirewallProfile;
+        let mut firewall_products: Vec<FirewallProductInfo> = Vec::new();
 
         {
             // We have to connect to the INetFwPolicy interface
@@ -63,7 +66,7 @@ pub fn scan_firewall() -> Result<()> {
                 firewall == VARIANT_TRUE
             };
 
-            let firewalls = WindowsFirewallProfile {
+            firewalls = WindowsFirewallProfile {
                 public: public_fw,
                 private: private_fw,
                 domain: domain_fw
@@ -92,7 +95,6 @@ pub fn scan_firewall() -> Result<()> {
                 None // This is usually NULL
             )?;
 
-            let mut firewall_products: Vec<FirewallProductInfo> = Vec::new();
             loop { 
                 let mut objects = [None; 1];
                 let mut returned = 0;
@@ -122,29 +124,8 @@ pub fn scan_firewall() -> Result<()> {
                     firewall_products.push(product);
                 }
             }
-            display_firewall(firewalls, &firewall_products);
         }
         CoUninitialize();
+        Ok((firewalls, firewall_products))
     }
-    Ok(())
-}
-
-fn display_firewall(firewall: WindowsFirewallProfile, firewall_product: &Vec<FirewallProductInfo>) {
-        println!("\n{} Firewall Product(s) Available:", firewall_product.len());
-        println!("{}", "=".repeat(30));
-        if firewall_product.is_empty() {
-            println!("No Third Party Firewalls Detected");
-            println!("Note: Windows Defender is most likely active as your firewall. It won't show up here.");
-        } else {
-            for (i, product) in firewall_product.iter().enumerate() {
-                println!("{}. {}", i + 1, product.name);
-                println!("  - Active: {}", if product.is_active {"Yes"} else {"No"});
-                println!("  - State: 0x{:X}\n", product.state);
-            }
-        }
-    
-        println!("Public Firewall {}", if firewall.public {"On"} else {"Off"});
-        println!("Private Firewall {}", if firewall.private {"On"} else {"Off"});
-        println!("Domain Firewall {}\n", if firewall.domain {"On"} else {"Off"});
-    
 }
