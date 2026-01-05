@@ -3,7 +3,7 @@ use crate::common::time::get_time;
 
 /// Display for Antivirus Module
 pub fn display_antivirus(products: &[ProductInfo], verbose: bool) {
-    println!("ANTIVIRUS PROTECTION AUDIT"); // Title for display
+    println!("ANTIVIRUS PROTECTION AUDIT");
     println!("{}", "=".repeat(30));
 
     if verbose {display_scan_details();}

@@ -29,7 +29,6 @@ fn display_scan_details() {
 fn display_summary(profiles: &WindowsFirewallProfile, products: &Vec<FirewallProductInfo>, verbose: bool) {
 
     let windows_active = profiles.public || profiles.private || profiles.domain;
-    // let windows_fully_active = profiles.public && profiles.private && profiles.domain;
     let active_products = products.iter().filter(|prod| prod.is_active).count();
     let total_active = if windows_active {1} else {0} + active_products;
 

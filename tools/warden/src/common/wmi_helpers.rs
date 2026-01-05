@@ -77,6 +77,7 @@ pub fn integer_property(obj: &IWbemClassObject, name: &str) -> Result<i32> {
     }
 }
 
-pub fn decimal_to_u64(decimal: DECIMAL) -> u128 {
+/// Converting DECIMAL to u128
+pub fn decimal_to_u128(decimal: DECIMAL) -> u128 {
     unsafe {((decimal.Hi32 as u128) << 64) | (decimal.Anonymous2.Lo64 as u128)}
 }

@@ -2,7 +2,7 @@ use windows::Win32::System::Com::*;
 use windows::Win32::System::UpdateAgent::*;
 use windows::core::*;
 
-use crate::common::wmi_helpers::decimal_to_u64;
+use crate::common::wmi_helpers::decimal_to_u128;
 
 pub struct UpdateInfo {
     pub title: String,
@@ -77,8 +77,10 @@ pub fn scan_updates() -> Result<UpdateSummary> {
             // Our search criteria for this is: "IsInstalled=0". This tells the search to find pending updates
             let search_criteria = BSTR::from("IsInstalled=0");
 
+            println!("Grabbing Updates, this may take 5-30 seconds...");
             // We then use the 'Search' method with our criteria. This allows us to search for updates...if that wasn't obvious
             // for more info on 'Search': https://learn.microsoft.com/en-us/windows/win32/api/wuapi/nf-wuapi-iupdatesearcher-search
+            // This is what takes so long to complete as we are grabbing information from Windows Update Services
             let data = searcher.Search(&search_criteria)?;
 
             // Now we can get our updates from the search
@@ -118,7 +120,7 @@ pub fn scan_updates() -> Result<UpdateSummary> {
 
                 // Then the size
                 let max_size = update.MaxDownloadSize()?;
-                let max_bytes = decimal_to_u64(max_size);
+                let max_bytes = decimal_to_u128(max_size);
                 let max_mb = max_bytes as f64 / 1024.0 / 1024.0;
 
                 // Now lets get our collection of categories
@@ -178,7 +180,7 @@ pub fn scan_updates() -> Result<UpdateSummary> {
                 driver_count: driver_count,
                 other_count: other_count, 
                 update_list
-            }
+            };
             
             // Remove the '//' below to see what happens
             // CoUninitialize();

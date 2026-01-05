@@ -24,7 +24,7 @@ pub fn scan_firewall() -> Result<(WindowsFirewallProfile, Vec<FirewallProductInf
         WARDEN - Firewall Module
 
         This module is closely similar to the Antivirus Module. So similar that I copied the logic of the antivirus product and changed a single argument.
-        The Firewall module is also one of the easiest to make and understand with all you needing is a few lines of code to make it work.
+        The Firewall module is also one of the easiest to make and understand.
     */
     unsafe {
 
@@ -33,7 +33,7 @@ pub fn scan_firewall() -> Result<(WindowsFirewallProfile, Vec<FirewallProductInf
             println!("Error with COM initilaization in Firewall module");
             return Err(_com.into());
         }
-
+        
         let firewalls: WindowsFirewallProfile;
         let mut firewall_products: Vec<FirewallProductInfo> = Vec::new();
 
