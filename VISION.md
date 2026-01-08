@@ -52,7 +52,7 @@ Three additional tools I want to build, though I'm still figuring out if they're
 - **GUARDIAN** - Ransomware Protection
 - **SENTINEL** - Suspicious Activity Monitor
 - **VOICE** - AI...Something (I'm not sure on this one yet)
-S
+
 ## The Money Talk
 
 Look, I need to be upfront about this. This is probably years away, but if SysDefense gains traction, I want to create a GUI version and charge for it. Here's why:
@@ -76,8 +76,8 @@ If we get there, **all revenue will be public**. You'll know exactly what comes 
 
 Pricing would likely be:
 - CLI: Free forever
-- GUI Standard ($10/mo or $100/yr): All open-source tools with a nice interface
-- GUI Premium ($30/mo or $300/yr): Everything + the closed-source tools
+- GUI Standard ($5/mo or $50/yr): All open-source tools with a nice interface
+- GUI Premium ($15/mo or $100/yr): Everything + the closed-source tools
 
 This could all change. We're nowhere near this yet. But I want to be transparent about where this could go.
 
