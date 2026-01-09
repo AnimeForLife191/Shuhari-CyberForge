@@ -3,12 +3,14 @@ use clap::{Parser, Subcommand};
 use warden::{
     scan_antivirus, 
     scan_updates, 
-    scan_firewall
+    scan_firewall,
+    scan_uac
 };
 use warden::{
     display_antivirus, 
     display_updates,
-    display_firewalls
+    display_firewalls,
+    display_uac
 };
 
 #[derive(Parser)]
@@ -32,7 +34,8 @@ enum Command {
 enum WardenCommand {
     Antivirus, // WARDEN antivirus subcommand
     Updates, // WARDEN updates subcommand
-    Firewall // WARDEN firewall subcommand
+    Firewall, // WARDEN firewall subcommand
+    Uac // WARDEN uac subcommand
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -43,6 +46,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             WardenCommand::Antivirus => display_antivirus(&scan_antivirus()?, cli.verbose),
             WardenCommand::Updates => display_updates(scan_updates()?, cli.verbose),
             WardenCommand::Firewall => display_firewalls(scan_firewall()?, cli.verbose),
+            WardenCommand::Uac => display_uac(scan_uac()?, cli.verbose),
         }
     }
     Ok(())
