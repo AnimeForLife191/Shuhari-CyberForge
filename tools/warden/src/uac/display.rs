@@ -8,6 +8,10 @@ pub fn display_uac(info: UacInfo, verbose: bool) {
     if verbose {display_scan_details();}
 
     display_summary(&info);
+
+    if verbose {display_technical(&info);}
+
+    display_assessment(&info);
     
 }
 
@@ -22,8 +26,40 @@ fn display_scan_details() {
 
 fn display_summary(info: &UacInfo) {
     println!("Summary:");
-    println!("Status: {}", if info.enabled {"Enabled"} else {"Disabled"});
-    println!("Notification Level: {}", decode_prompt_level(info.prompt_level));
+    println!(" - Status: {}", if info.enabled {"Enabled"} else {"Disabled"});
+    println!(" - Notification Level: {}", decode_prompt_level(info.prompt_level));
+    println!();
+}
+
+fn display_technical(info: &UacInfo) {
+    println!("Technical Information:");
+    println!(" - EnableLUA Value: {}", info.lua_value);
+    println!(" - ConsentPromptBehaviorAdmin Value: {}", info.prompt_level);
+    println!(" - Registry Access: 'HKEY_LOCAL_MACHINE' with 'KEY_READ' permissions");
+    println!();
+}
+
+fn display_assessment(info: &UacInfo) {
+    println!("Security Assessment:");
+
+    if info.enabled {
+        println!(" - UAC is enabled (Recommended)");
+    } else {
+        println!(" - UAC is disabled (Not Recommended)");
+    }
+
+    if info.prompt_level == 0 {
+        println!(" - Using 'Never Notify' notification level (Not Secure)");
+    } else if info.prompt_level == 1 {
+        println!(" - Using 'Credentials on secure desktop' notification level (Secure)");
+    } else if info.prompt_level == 2 {
+        println!(" - Using 'Consent on secure desktop' notification level (Secure)");
+    } else if info.prompt_level == 5 {
+        println!(" - Using 'Consent' notification level (Default Secure)");
+    } else {
+        println!(" - Unknown notification level");
+    }
+    println!()
 }
 
 fn decode_prompt_level(level: u32) -> &'static str {

@@ -2,6 +2,7 @@ use windows::core::*;
 use windows::Win32::System::Registry::*;
 
 pub struct UacInfo {
+    pub lua_value: u32,
     pub enabled: bool,
     pub prompt_level: u32
 }
@@ -41,9 +42,11 @@ pub fn scan_uac() -> Result<UacInfo> {
         let mut size: u32 = std::mem::size_of::<u32>() as u32;
         registry_query(key, value, &mut prompt_behavior, &mut size);
 
+        // We'll close the key now otherwise we'll get an error
         let _ = RegCloseKey(key);
         
         Ok(UacInfo {
+            lua_value: enable_lua,
             enabled: enable_lua == 1,
             prompt_level: prompt_behavior
         })
