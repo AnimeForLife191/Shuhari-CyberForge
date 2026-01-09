@@ -1,8 +1,8 @@
 # WARDEN - Windows Security Auditor (MVP)
 
-[![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL%203.0-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
+[![License: MIT](https://img.shields.io/badge/License-MIT%20-lightgrey.svg)](https://opensource.org/license/mit)
 [![Rust](https://img.shields.io/badge/rust-1.92%2B-orange.svg)](https://www.rust-lang.org)
-[![Platform](https://img.shields.io/badge/platform-Windows-lightgrey.svg)](https://www.microsoft.com/windows)
+[![Platform](https://img.shields.io/badge/platform-Windows-blue.svg)](https://www.microsoft.com/windows)
 
 **WARDEN** is a fast Windows security auditing tool that gives you instant visibility into your systems security. Written in Rust, it uses Windows APIs for reliability.
 > **The First tool in the [SysDefense](VISION.md) security suite** - Hopefully to be a community-driven cybersecurity platform.
@@ -78,10 +78,8 @@ Technical Information:
 - Antivirus detection and status (Better error handling and output. Educational content needed)
 - Windows Update status (Takes 5-30 seconds to load updates, could be faster? Educational content needed)
 - Firewall detection and status (Better output. Educational content needed)
-
-### In Progress
-- User Account Control status
-- User Account Security Audit
+- User Account Control status (Better output, Educational content needed)
+- User Account Security Audit (Better output, Educational content needed)
 
 ### Planned - Phase 2
 - OS version and support life cycle
