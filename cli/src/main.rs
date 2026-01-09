@@ -4,13 +4,15 @@ use warden::{
     scan_antivirus, 
     scan_updates, 
     scan_firewall,
-    scan_uac
+    scan_uac,
+    scan_uas
 };
 use warden::{
     display_antivirus, 
     display_updates,
     display_firewalls,
-    display_uac
+    display_uac,
+    display_uas
 };
 
 #[derive(Parser)]
@@ -35,7 +37,8 @@ enum WardenCommand {
     Antivirus, // WARDEN antivirus subcommand
     Updates, // WARDEN updates subcommand
     Firewall, // WARDEN firewall subcommand
-    Uac // WARDEN uac subcommand
+    Uac, // WARDEN uac (User Account Control) subcommand
+    Uas // WARDEN uas (User Account Security) subcommand
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -47,6 +50,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             WardenCommand::Updates => display_updates(scan_updates()?, cli.verbose),
             WardenCommand::Firewall => display_firewalls(scan_firewall()?, cli.verbose),
             WardenCommand::Uac => display_uac(scan_uac()?, cli.verbose),
+            WardenCommand::Uas => display_uas(scan_uas()?, cli.verbose),
         }
     }
     Ok(())
