@@ -50,7 +50,7 @@ I believe it can be better, more affordable, more transparent, and more feature-
 
 Four foundational tools that will always be 100% open source:
 
-- **Shugo** - System Audit and Educator *(MVP Available Now - [ShugoREADME.md](./tools/shugo/ShugoREADME.md))*
+- **Shugo** - System Audit and Educator *(MVP Available Now - [ShugoREADME.md](./tools/shugo/src/ShugoREADME.md))*
 - **[Name TBD]** - Malware Scanner *(In Development)*
 - **[Name TBD]** - Network Security *(Planned)*
 - **[Name TBD]** - Password Manager *(Planned)*
