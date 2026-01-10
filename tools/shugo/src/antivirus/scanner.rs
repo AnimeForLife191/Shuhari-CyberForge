@@ -1,7 +1,9 @@
-use windows::core::*;
+//! Welcome to Shuhari CyberForge, a 
+//! 
+
+use windows::core::*; 
 use windows::Win32::System::Com::*;
 use windows::Win32::System::Wmi::*;
-
 use crate::common::wmi_helpers::{string_property, integer_property};
 
 pub struct ProductInfo {
@@ -14,7 +16,7 @@ pub struct ProductInfo {
 
 /// Grabing antivirus for Windows
 pub fn scan_antivirus() -> Result<Vec<ProductInfo>> {
-    // NOTE: Instead of making one big safe block, we could only use them when needed but for now this was easier to learn with
+   
     unsafe { // We use windows unsafe block here because were using foreign functions that are unsafe with Rust
         /*
             WARDEN: COM Apartments

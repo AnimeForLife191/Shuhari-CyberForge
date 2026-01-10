@@ -1,112 +1,107 @@
-# WARDEN - Windows Security Auditor (MVP)
+# Shuhari CyberForge
+
+**Community-Powered Cybersecurity**
 
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL%203.0-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 [![Rust](https://img.shields.io/badge/rust-1.92%2B-orange.svg)](https://www.rust-lang.org)
 [![Platform](https://img.shields.io/badge/platform-Windows-lightgrey.svg)](https://www.microsoft.com/windows)
 
-**WARDEN** is a fast Windows security auditing tool that gives you instant visibility into your systems security. Written in Rust, it uses Windows APIs for reliability.
-> **The First tool in the [SysDefense](VISION.md) security suite** - Hopefully to be a community-driven cybersecurity platform.
+## What Is It?
 
-## Features
+**Shuhari CyberForge™** is a community-powered cybersecurity suite written in Rust, designed to provide powerful, affordable, and educational security tools for everyday users and developers.
 
-### Security Audit
-- **Antivirus Detection** - Lists all installed AV products with real-time protection and definition status
-- **Firewall Verification** - Checks Windows Firewall profiles and third-party firewall products
-- **Update Identification** - Shows pending Windows updates with classification (Critical, Security, etc.) and sizes
+The name comes from **Shuhari**, a Japanese martial art concept that describes the stages of learning to mastery:
+- **Shu** - Protect/obey the fundamentals
+- **Ha** - Detach/break the rules to innovate
+- **Ri** - Transcend the rules to create freely
 
-### Technical Advantages
-- **Native Performance** - Direct Windows API calls (COM/WMI)
-- **Verbose Mode** - Extended technical information for security enthusiasts
+This mirrors our journey: Learning security fundamentals, innovating on existing tools, and ultimately creating something new together
 
-## How to Install
+My goal is to build an ecosystem that rivals major security platforms like Norton and McAfee, but with:
+- **Stronger transparency** - Know what your security software is doing
+- **Better tools** - Modern, efficient, and actually useful
+- **Community-driven philosophy** - Built by and for the people who use it
 
-Download from [Releases](https://github.com/AnimeForLife191/sysdefense/releases/tag/v0.1.0)
-or build from source:
-```bash
-git clone https://github.com/AnimeForLife191/sysdefense
-cd sysdefense
-cargo build --release
-```
+To give **Shuhari CyberForge** a unique identity, each tool will be represented by a custom anime-themed character.
 
-Executable will be at `target\release\sysdefense-cli.exe`
+## Why I'm Building This
 
-## Usage
+Security software is often:
+- Expensive
+- Closed-off
+- Bloated with features nobody asked for
 
-Run from the project directory after building:
-```bash
-.\target\release\sysdefense-cli.exe warden antivirus -v
-```
+I believe it can be better, more affordable, more transparent, and more feature-rich. 
 
-Available commands:
-- `warden antivirus` - Check antivirus status
-- `warden firewall` - Check firewall configuration
-- `warden updates` - Check Windows Update status
+**Shuhari CyberForge** is an opportunity for both myself and others to learn how real security tools work while contributing to something that could make a real impact. Even if we never rival the big players, we'll learn a ton and build something useful along the way.
 
-Add `-v` for verbose output with technical details.
+## Core Pillars
 
-**Example output:**
-```
-ANTIVIRUS PROTECTION AUDIT
-==============================
-Scan Details:
- - Scan Started: 00:00:00 UTC
- - WMI Namespace: ROOT\SecurityCenter2
- - Query: Select displayName, productState FROM AntiVirusProduct
+**Shuhari CyberForge** is built on four principles:
 
-Summary:
- - Products Found: 1
- - Active: 1/1
- - Real-time Protection: 1/1
- - Definitions Updated: 1/1
+1. **Community**
+2. **Security**
+3. **Education**
+4. **Affordability**
 
-Product Details:
+## The Tools
 
-1. Windows Defender
- - Status: Active
- - Real-time: Enabled
- - Definitions: Up-to-date
- - Product Hexadecimal State: 0x61100
- - Product Raw State: 397568
+### Always Free and Open Source
 
-Technical Information:
- - COM Apartment: MTA (Multi-threaded)
- - WMI Context: CLSCTX_INPROC_SERVER
-```
-## Roadmap
+Four foundational tools that will always be 100% open source:
 
-### Completed (Will be improved)
-- Antivirus detection and status (Better error handling and output. Educational content needed)
-- Windows Update status (Takes 5-30 seconds to load updates, could be faster? Educational content needed)
-- Firewall detection and status (Better output. Educational content needed)
+- **Shugo** - System Audit and Educator *(MVP Available Now - [ShugoREADME.md](./tools/shugo/ShugoREADME.md))*
+- **[Name TBD]** - Malware Scanner *(In Development)*
+- **[Name TBD]** - Network Security *(Planned)*
+- **[Name TBD]** - Password Manager *(Planned)*
 
-### In Progress
-- User Account Control status
-- User Account Security Audit
+### Maybe Someday
 
-### Planned - Phase 2
-- OS version and support life cycle
-- Browser security basics
-- SMBv1 protocol check
-- RDP security audit
-- PowerShell execution policy
-- BitLocker encryption status
+Three additional tools I want to build, though I'm still figuring out if they're feasible or if they can be fully open source:
 
-### Future - Phase 3
-- Advanced browser extension analysis
-- Network shares audit
-- Windows privacy settings review
-- Startup programs analysis
-- Password policy enforcement check
-- Windows Defender advanced feature status
+- **[Name TBD]** - Ransomware Protection
+- **[Name TBD]** - Suspicious Activity Monitor
+- **[Name TBD]** - AI...Something (I'm not sure on this one yet)
 
-## Want to Help?
+## Community Plans
 
-You don't need to know Rust to help if you want:
-- Star the [SysDefense repo](https://github.com/AnimeForLife191/sysdefense)
-- Report bugs or suggest features
-- Improve documentation
-- Share ideas for new security checks
-- Submit code improvements (all skill levels welcome!)
+If **Shuhari CyberForge** succeeds, I want to do cool stuff with the community:
+- Recognition for contributors
+- Future bug bounty programs
+- Coding and Art competitions
+- Giveaways
+- And loads more
 
-## More Info on SysDefense
-If you're interested in SysDefense go check out my [SysDefense Vision](VISION.md)
+If it does really well, I'd like to make a Comedy/Educational/Action anime of **Shuhari CyberForge**. Though that's my own desire.
+
+All of this depends on whether people actually use and care about **Shuhari CyberForge**.
+
+## Disclaimer
+
+**Shuhari CyberForge and all its tools are provided "AS IS", without warranty of any kind.**
+This is experimental, educational software created by a 21 year old Cybersecurity student and community contributors. 
+
+By using this software, you understand and agree that:
+- The developer and contributors are **not liable** for any damage, data loss, or security incidents that may occur from its use.
+- This software is **not a certified security product**.
+- You are responsible for evaluating its suitability for your environment.
+
+**Use at your own risk.**
+
+## Real Talk
+
+I'm writing this as a dream, fully aware it might never reach the success I'm imagining. **And I'm okay with that.**
+
+I'm doing this mainly to:
+- Improve my own skills
+- Learn how security tools actually work
+- Teach others through my mistakes and successes
+- Build something useful, even if it's just for a small group
+
+If even 100 people use **Shugo** and learn something about Windows security, that's a win.
+
+If you believe in this vision or just want to support the work: 
+- **[Star the repository](https://github.com/AnimeForLife191/Shuhari-CyberForge)** - It helps more than you know.
+- **Feedback & Suggestions** - What do you want to see in these tools?
+- **Submit code improvements** (all skill levels welcome!) - My code is probably worse then yours.
+- **Improve Documentation** - My writing is even worse.
