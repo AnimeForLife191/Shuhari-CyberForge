@@ -112,6 +112,49 @@ pub fn integer_property(obj: &IWbemClassObject, name: &str) -> Result<i32> {
 }
 
 /// Converting DECIMAL to u128
+/*
+    Shugo: DECIMAL Converting
+
+    The `DECIMAL` type is a 128-bit value that Windows uses for precise decimal arithmetic.
+    Here is the `DECIMAL` struct for Rust:
+    DECIMAL {
+        wReserved: u16,
+        Anonymous1: DECIMAL_0,
+        Hi32: u32,
+        Anonymous2: DECIMAL_1,
+    }
+
+    DECIMAL_1 {
+        Anonymous: DECIMAL_1_0,
+        Lo64: u64,
+    }
+
+    The value we want to extract is stored as a 96-bit integer split across:
+    - Hi32: The upper 32 bits
+    - Lo64: The lower 64 bits
+
+    For example, lets say we have these values:
+    - Hi32 = 0x00000005
+    - Lo64 = 0x0000000000000400
+
+    First, we convert Hi32 to u128 and shift it left by 64 bits:
+    `(decimal.Hi32 as u128) << 64`
+    - Hi32 as u128 = 0x0000000000000005
+    - Shift left 64 bits = 0x00000005_00000000_00000000
+
+    This moves the Hi32 bits into the correct position in the 128 bit value.
+
+    Now we convert Lo64 to u128:
+    `(decimal.Anonymous2.Lo64 as u128)`
+    - Lo64 as u128 = 0x00000000_00000000_00000400
+
+    Finally, we combine them using bitwise OR:
+      0x00000005_00000000_00000000  (Hi32 shifted)
+    | 0x00000000_00000000_00000400  (Lo64)
+    = 0x00000005_00000000_00000400  (Combined result)
+
+    This gives us the complete 96-bit integer value as a u128.
+*/
 pub fn decimal_to_u128(decimal: DECIMAL) -> u128 {
     unsafe {((decimal.Hi32 as u128) << 64) | (decimal.Anonymous2.Lo64 as u128)}
 }

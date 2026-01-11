@@ -1,5 +1,19 @@
+//! This is the Windows Update Module for Shugo. We are able to see:
+//! 
+//! - Pending Windows Updates
+//! - Update Classification (Critical, Security, Definition, Feature, Driver)
+//! - Update Sizes
+//! 
+//! Unlike the Antivirus Module which uses WMI, this module interfaces directly with the
+//! Windows Update Agent (WUA) API. This requires more complex COM interactions but 
+//! provides detailed update information directly from Windows Update Services.
+//! 
+//! Note: Depending on your network and computer hardware, Scanning for updates can 
+//! take around 5-30 seconds as it queries Microsoft's servers.
+
 use windows::Win32::System::Com::*;
 use windows::Win32::System::UpdateAgent::*;
+use windows::Win32::Foundation::*;
 use windows::core::*;
 
 use crate::common::wmi_helpers::decimal_to_u128;
@@ -7,7 +21,7 @@ use crate::common::wmi_helpers::decimal_to_u128;
 pub struct UpdateInfo {
     pub title: String,
     pub classification: String,
-    pub max_mb: f64
+    pub min_mb: f64
 }
 
 pub struct UpdateSummary {
@@ -21,82 +35,129 @@ pub struct UpdateSummary {
     pub update_list: Vec<UpdateInfo>
 }
 
-/// Constants for GUID classification
+/// Update Classification GUIDs
+/// 
+/// These are Microsoft's official GUIDs for update categories used by
+/// the Windows Update Agent API to identify different types of updates.
 const CRITICAL_UPDATES_GUID: &str = "e6cf1350-c01b-414d-a61f-263d14d133b4";
 const SECURITY_UPDATES_GUID: &str = "0fa1201d-4330-4fa8-8ae9-b877473b6441";
 const DEFINITION_UPDATES_GUID: &str = "e0789628-ce08-4437-be74-2495b842f43b";
 const FEATURE_UPDATES_GUID: &str = "b54e7d24-7add-428f-8b75-90a396fa584f";
 const DRIVER_UPDATES_GUID: &str = "ebfc1fc5-71a4-4f7b-9aca-3b9a503104a0";
 
-/// Grabing updates for Windows
+/// Grabbing updates for Windows
 pub fn scan_updates() -> Result<UpdateSummary> {
-    /*
-        WARDEN: If you haven't already, please go look at the Antivirus module then come back here
-
-        Even though this module is more lighter then the Antivirus module, it's still holds key information about COM clean up
-    */
     unsafe {
+        /* 
+            Shugo: COM Library Initialization
 
-        let _com: HRESULT = CoInitializeEx(None, COINIT_MULTITHREADED);
-        if _com.is_err() { 
-            println!("Error with COM initilaization in Update module");
-            return Err(_com.into()); // Error Check    
+            Just like in the Antivirus Module, we need to initialize COM before
+            using any Windows Update APIs. We're using COINIT_MULTITHREADED for
+            consistency across all of Shugo's modules.
+
+            For more information on `CoInitializeEx`:
+            (https://learn.microsoft.com/en-us/windows/win32/api/combaseapi/nf-combaseapi-coinitializeex) - C++
+            (https://microsoft.github.io/windows-docs-rs/doc/windows/Win32/System/Com/fn.CoInitializeEx.html) - Rust
+        */
+        let _com: HRESULT = CoInitializeEx(
+            None, 
+            COINIT_MULTITHREADED
+        );
+
+        match _com { 
+            S_OK => {
+                // COM initialized successfully
+            },
+            E_OUTOFMEMORY => {
+                println!("COM initialization failed: Out of memory");
+                return Err(_com.into());
+            },
+            E_INVALIDARG => {
+                println!("COM initialization failed: Invalid argument");
+                return Err(_com.into());
+            },
+            E_UNEXPECTED => {
+                println!("COM initialization failed: Unexpected error");
+                return Err(_com.into());
+            }
+            _ => {
+                println!("COM initialization failed with HRESULT: 0x{:?}", _com);
+                return Err(_com.into());
+            }
         }
 
-        let summary;
+        let summary: UpdateSummary;
 
         {
             /*
-            WARDEN: Understanding COM Objects Lifetimes
+                Shugo: Creating an Update Session
 
-            This scope is meant to be a controlled enviroment for COM objects:
+                Before we can grab updates, we need to make a session for the Windows Update Agent. Now as you can see we're 
+                using `CLSCTX_ALL` instead of `CLSCTX_INPROC_SERVER` like we did in the Antivirus Module. Why do you think that is?
 
-            1. Problem: COM objects have self-destruct logic when dropped, now this isn't bad....BUT
+                The Windows Update service may run in a different process or even as a system service and `CLSCTX_ALL` allows COM
+                to find it regardless of where it's running.
 
-            2. Issue: When Rust drops these objects, it creates a problem later when we try to close the COM thread as 
-                we can't leave the COM thread initialized. This is a memory leak.
-                When we call 'CoUninitialize()' to close the thread, Windows will destroy the COM objects....then Rust 
-                will try to destroy them again.
-
-            3. Solution: This scope will create the objects inside, then will be destroyed at the end of scope by Rust.
-                This way, CoUninitialize() safely cleans the emptey COM state.
-
-            4. Test: Uncomment the CoUninitialize() inside the end of this scope and see for yourself   
+                For more information on `IUpdateSession`:
+                (https://learn.microsoft.com/en-us/windows/win32/api/wuapi/nn-wuapi-iupdatesession) - C++
+                (https://microsoft.github.io/windows-docs-rs/doc/windows/Win32/System/UpdateAgent/struct.IUpdateSession.html) - Rust
             */
+            let session: IUpdateSession = CoCreateInstance(
+                &UpdateSession, 
+                None, 
+                CLSCTX_ALL
+            )?;
 
-            // Connect to Windows Update Service
-            // for more info on IUpdateSession: https://learn.microsoft.com/en-us/windows/win32/api/wuapi/nn-wuapi-iupdatesession
-            let session: IUpdateSession = CoCreateInstance(&UpdateSession, None, CLSCTX_ALL)?;
-            // Why do we use 'CLSCTX_ALL' here?
+            /*
+                Shugo: Creating an Update Searcher
 
-            // To search for updates we need to create an instance for our search
-            // for more info on 'IUpdateSearcher': https://learn.microsoft.com/en-us/windows/win32/api/wuapi/nn-wuapi-iupdatesearcher
-            // for more info on 'CreateUpdateSearcher': https://learn.microsoft.com/en-us/windows/win32/api/wuapi/nf-wuapi-iupdatesession-createupdatesearcher
+                We need an interface to search for our updates, to do that we use the `CreateUpdateSearcher` method from our `IUpdateSession`
+                interface. This gives us an `IUpdateSearcher` interface which can search for updates on Windows servers.
+
+                For more information on `IUpdateSearcher`: 
+                (https://learn.microsoft.com/en-us/windows/win32/api/wuapi/nn-wuapi-iupdatesearcher) - C++
+                (https://microsoft.github.io/windows-docs-rs/doc/windows/Win32/System/UpdateAgent/struct.IUpdateSearcher.html) - Rust
+            */
             let searcher: IUpdateSearcher = session.CreateUpdateSearcher()?;
+            
 
-            // Our search criteria for this is: "IsInstalled=0". This tells the search to find pending updates
-            let search_criteria = BSTR::from("IsInstalled=0");
+            /*
+                Shugo: Searching for Updates
 
+                Using our `IUpdateSeacher` interface, we now have multiple methods we can use to get updates. We'll be using the method
+                `Search` which performs a synchronous search for updates using a criteria in `BSTR` format. We'll use the criteria
+                "IsInstalled=0". This tells the search to look for updates we haven't installed yet.
+
+                Note: This is why the Update Module takes so long to grab information. We have to grab the updates from Windows servers
+                which can take 5-30 seconds.
+
+                For more information on `Search`:
+                (https://learn.microsoft.com/en-us/windows/win32/api/wuapi/nf-wuapi-iupdatesearcher-search) - C++
+                (https://microsoft.github.io/windows-docs-rs/doc/windows/Win32/System/UpdateAgent/struct.IUpdateSearcher.html#method.Search) - Rust
+            */
+            let search_criteria: BSTR = BSTR::from("IsInstalled=0");
             println!("Grabbing Updates, this may take 5-30 seconds...");
-            // We then use the 'Search' method with our criteria. This allows us to search for updates...if that wasn't obvious
-            // for more info on 'Search': https://learn.microsoft.com/en-us/windows/win32/api/wuapi/nf-wuapi-iupdatesearcher-search
-            // This is what takes so long to complete as we are grabbing information from Windows Update Services
-            let data = searcher.Search(&search_criteria)?;
+            let data: ISearchResult = searcher.Search(&search_criteria)?;
 
-            // Now we can get our updates from the search
-            // for more info on 'Updates': https://learn.microsoft.com/en-us/windows/win32/api/wuapi/nf-wuapi-isearchresult-get_updates
-            // NOTE: There is not a lot on this page, but I wanted to add it just in case
-            let updates = data.Updates()?;
+            /*
+                Shugo: Grabbing Updates
 
-            // We will be able to count how many updates we have in our collection using the 'Count' method
-            // Their are multiple different methods to use with 'IUpdateCollection'
-            // for more info on 'IUpdateCollection': https://learn.microsoft.com/en-us/windows/win32/api/wuapi/nn-wuapi-iupdatecollection
+                Once the search is complete, we then need to get our updates from that search. To do this we use the `Updates` method
+                which will grab those updates and give us an `IUpdateCollection` interface. This allows us to work with our collection 
+                of updates with multiple different methods.
+                
+                For example, we'll use the `Count` method to grab the total count of updates we have in our collection.
+
+                For more information on `IUpdateCollection`: 
+                (https://learn.microsoft.com/en-us/windows/win32/api/wuapi/nn-wuapi-iupdatecollection) - C++
+                (https://microsoft.github.io/windows-docs-rs/doc/windows/Win32/System/UpdateAgent/struct.IUpdateCollection.html) - Rust
+            */
+            let updates: IUpdateCollection = data.Updates()?;
             let update_count = updates.Count()?;
 
-            // We will process each update in the collection
-            let mut update_list: Vec<UpdateInfo> = Vec::new();
+            let mut update_list: Vec<UpdateInfo> = Vec::new(); // Initializing Vector for updates
 
-            // We will then setup variables for counting our classifications
+            // Counts For different classifications
             let mut critical_count = 0;
             let mut security_count = 0;
             let mut definition_count = 0;
@@ -104,49 +165,90 @@ pub fn scan_updates() -> Result<UpdateSummary> {
             let mut driver_count = 0;
             let mut other_count = 0;
             
-            // This for loop will be used to grab information on our updates
+            /*
+                Shugo: Detail Gathering
+
+                Now lets get our updates details. This for loop will go through each update gathering information like
+                Title, Size, and Classification. We'll be using a lot of different methods here so don't worry if you
+                loose track.
+            */
             for i in 0..update_count { // We get updates at index i (COM collections are 0-indexed like Rust)
 
-                // We need to access the properties of our updates by getting into the right interface, we start with 'IUpdate'
-                // for more info on 'IUpdate': https://learn.microsoft.com/en-us/windows/win32/api/wuapi/nn-wuapi-iupdate
-                let update = updates.get_Item(i)?;
-                
-                // We then head to 'IUpdate2' using the 'cast' method
-                // for more info on 'IUpdate2': https://learn.microsoft.com/en-us/windows/win32/api/wuapi/nn-wuapi-iupdate2
-                let update2: IUpdate2 = update.cast()?;
+                /*
+                    Shugo: Setting Up IUpdate Interface
 
-                // Lets grab the title of our update first
-                let title = update.Title()?.to_string();
+                    We'll use the `get_Item` method which gets or sets an `IUpdate` interface in a collection. Their are multiple 
+                    different `IUpdate` interfaces that we can use but this one gives us all the options we need.
 
-                // Then the size
-                let max_size = update.MaxDownloadSize()?;
-                let max_bytes = decimal_to_u128(max_size);
-                let max_mb = max_bytes as f64 / 1024.0 / 1024.0;
+                    For more information on `IUpdate`:
+                    (https://learn.microsoft.com/en-us/windows/win32/api/wuapi/nn-wuapi-iupdate) - C++
+                    (https://microsoft.github.io/windows-docs-rs/doc/windows/Win32/System/UpdateAgent/struct.IUpdate.html) - Rust
+                */
+                let update: IUpdate = updates.get_Item(i)?;
 
-                // Now lets get our collection of categories
-                let categories = update2.Categories()?;
+                /*
+                    Shugo: Update Size
 
-                // Next well make our classification variable
-                let mut classification: Option<String> = None;
+                    To get our update size, we can use the methods `MaxDownloadSize` or `MinDownloadSize`. This will give us ethier a 
+                    maximum size for a download or a minimum size. These sizes can vary massively as using `MaxDownloadSize` will
+                    give us a size for worst case scenerio. Meaning a simple definitions update can say 1.5GB but will most likely
+                    only be less than 1MB. Keep that in mind when using these methods.
 
-                // This for loop will be for getting the category name and id of our update
-                for j in 0..categories.Count()? { 
-                    let category = categories.get_Item(j)?;
+                    Now we need to convert our DECIMAL type to a u128 type. For further information on how this works go to the helper
+                    function in: `tools\shugo\src\common\wmi_helpers.rs`
 
-                    // NOTE: We will get two types of categories for each update.
-                    // 1. The update classification (UpdateClassification)
-                    // 2. The product thats recieving the update (Product)
-                    // For now we want the classification
+                    Finally, we convert the u128 type to a f64 type and divide it by 1024.0 to get kilobytes (KB). Then divide it agian
+                    by 1024.0 one more time to get megabytes (MB).
+
+                    For more information on `MaxDownloadSize` and MinDownloadSize:
+                    (https://learn.microsoft.com/en-us/windows/win32/api/wuapi/nf-wuapi-iupdate-get_maxdownloadsize) - MaxDownloadSize
+                    (https://learn.microsoft.com/en-us/windows/win32/api/wuapi/nf-wuapi-iupdate-get_mindownloadsize) - MinDownloadSize
+                */
+                let min_size: DECIMAL = update.MinDownloadSize()?;
+                let min_bytes: u128 = decimal_to_u128(min_size);
+                let min_mb: f64 = min_bytes as f64 / 1024.0 / 1024.0;
+
+                /*
+                    Shugo: Update Title
+
+                    Titles of updates can be grabed easily using the `Title` method and converting it to a `String` type.
+
+                    For more information on `Title`:
+                    (https://learn.microsoft.com/en-us/windows/win32/api/wuapi/nf-wuapi-iupdate-get_title) - C++
+                */
+                let title: String = update.Title()?.to_string();
+
+                /*
+                    Shugo: Update Categories
+
+                    By using the `Categories` method, we can get the categories of the update and put them in a 
+                    `ICategoryCollection` interface.
                     
+                    Now we'll do a for loop here for two reasons:
+                    - The first is you get two categories for each update, the update classification (UpdateClassification)
+                      and the product recieving it (Product). We want to just filter the (UpdateClassification) part of our 
+                      updates so we use the `Type` method.
+                      For more information on `Type`
+                      (https://learn.microsoft.com/en-us/windows/win32/api/wuapi/nf-wuapi-icategory-get_type) - C++
+
+                    - The second reason is so we can grab a count of how many classifications of each type we have. Each 
+                      (UpdateClassification) is tied to a GUID from Windows, this makes it easy to filter the classifications
+                      using the `CategoryID` method.
+                      For more information on `CategoryID`:
+                      (https://learn.microsoft.com/en-us/windows/win32/api/wuapi/nf-wuapi-icategory-get_categoryid)
+                */
+                let categories: ICategoryCollection = update.Categories()?;
+                let mut classification: Option<String> = None; // Classification variable
+
+                for j in 0..categories.Count()? { 
+                    let category: ICategory = categories.get_Item(j)?;
                     if category.Type()? == "UpdateClassification" {
-                        // We grab the classification Name
-                        classification = Some(category.Name()?.to_string());
+                       
+                        classification = Some(category.Name()?.to_string());  // Grabbing the classification Name
 
-                        // Then the ID of the classification
-                        let id = category.CategoryID()?;
+                        let id = category.CategoryID()?; // ID of the classification
 
-                        // Now we can grab a total count of each classification we have for our updates
-                        // Each classification has an ID number attached to it so its easy to grab our counts like this
+                        // Grabbing count of classification type
                         if id == CRITICAL_UPDATES_GUID {
                             critical_count += 1;
                         } else if id == SECURITY_UPDATES_GUID {
@@ -167,7 +269,7 @@ pub fn scan_updates() -> Result<UpdateSummary> {
                     update_list.push(UpdateInfo { 
                         title, 
                         classification,
-                        max_mb,
+                        min_mb,
                     });
                 }
             }
@@ -181,19 +283,16 @@ pub fn scan_updates() -> Result<UpdateSummary> {
                 other_count: other_count, 
                 update_list
             };
-            
-            // Remove the '//' below to see what happens
-            // CoUninitialize();
+        }
+        /*
+            Shugo: Closing Thread
 
-        } // End of Scope
+            Just like in the antivirus module, we must uninitialize COM when we're done.
 
-        // Here is the the cleaning part of COM, when we use COM objects like 'IUpdateSession', 'IUpdateSearcher', 'ISearchResult' or 'IUpdateCollection'
-        // we need to clean them up so we can uninitialize the thread. Now Rust will do this on its own but theirs a slight problem with that.
-        // If Rust destroys them after being used, Windows will also want to destroy them before closing the thread. This cuases issues and we can't
-        // close the thread properly. There are two ways I have found to deal with this:
-        //     1. You can use a method called 'drop()', this will drop the specified object but if you have multiple objects it can become messy        
-        //     2. The option we're using is a scope. The COM objects will be dropped instead of destroyed after going out of scope.
-        // If you want to try yourself, comment the 'CoUninitialize()' below and uncomment the one in the scope
+            For more information on `CoUninitialize`:
+            (https://learn.microsoft.com/en-us/windows/win32/api/combaseapi/nf-combaseapi-couninitialize) - C++
+            (https://microsoft.github.io/windows-docs-rs/doc/windows/Win32/System/Com/fn.CoUninitialize.html) - Rust
+        */
         CoUninitialize();
         Ok(summary)
     } // End of unsafe block

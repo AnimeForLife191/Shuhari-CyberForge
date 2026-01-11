@@ -60,7 +60,7 @@ fn updates_summary(summary: &UpdateSummary, count: i32 ,class: &str, header: &st
             println!("{}. {}", i+1, info.title);
             i += 1;
             println!(" - Type: {}", info.classification);
-            println!(" - Size: {:.2} MB", info.max_mb);
+            println!(" - Size: {:.2} MB", info.min_mb);
             println!();
         }
     }
@@ -86,7 +86,7 @@ fn other_updates(summary: &UpdateSummary, count: i32, header: &str) {
         println!("{}. {}", display_count+1, info.title);
         display_count += 1;
         println!(" - Type: {}", info.classification);
-        println!(" - Size: {:.2} MB", info.max_mb);
+        println!(" - Size: {:.2} MB", info.min_mb);
         println!();
     }
 }
