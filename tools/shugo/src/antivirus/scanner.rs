@@ -4,7 +4,8 @@
 //! - Antivirus Status's
 //! - Product States
 //! 
-//! Lets see how we grab that information:
+//! To grab this information, we will have to know how to use COM, WMI, and Memory Management.
+//! That may seem like a lot but once you see how it works, it should click. Lets get started:
 
 use windows::core::*; 
 use windows::Win32::System::Com::*;
