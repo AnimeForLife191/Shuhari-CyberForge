@@ -2,7 +2,9 @@
 //! 
 //! - Pending Windows Updates
 //! - Update Classification (Critical, Security, Definition, Feature, Driver)
-//! - Update Sizes
+//! - Update Sizes (Min and Max)
+//! - Update Products (what software/component is being updated)
+//! - Update Descriptions
 //! 
 //! Unlike the Antivirus Module which uses WMI, this module interfaces directly with the
 //! Windows Update Agent (WUA) API. This requires more complex COM interactions but 
@@ -21,7 +23,10 @@ use crate::common::wmi_helpers::decimal_to_u128;
 pub struct UpdateInfo {
     pub title: String,
     pub classification: String,
-    pub min_mb: f64
+    pub min_mb: f64,
+    pub max_mb: f64,
+    pub product: String,
+    pub description: String
 }
 
 pub struct UpdateSummary {
@@ -32,7 +37,8 @@ pub struct UpdateSummary {
     pub feature_count: i32,
     pub driver_count: i32,
     pub other_count: i32,
-    pub update_list: Vec<UpdateInfo>
+    pub update_list: Vec<UpdateInfo>,
+    pub query: String
 }
 
 /// Update Classification GUIDs
@@ -170,7 +176,7 @@ pub fn scan_updates() -> Result<UpdateSummary> {
 
                 Now lets get our updates details. This for loop will go through each update gathering information like
                 Title, Size, and Classification. We'll be using a lot of different methods here so don't worry if you
-                loose track.
+                lose track.
             */
             for i in 0..update_count { // We get updates at index i (COM collections are 0-indexed like Rust)
 
@@ -189,7 +195,7 @@ pub fn scan_updates() -> Result<UpdateSummary> {
                 /*
                     Shugo: Update Size
 
-                    To get our update size, we can use the methods `MaxDownloadSize` or `MinDownloadSize`. This will give us ethier a 
+                    To get our update size, we can use the methods `MaxDownloadSize` or `MinDownloadSize`. This will give us either a 
                     maximum size for a download or a minimum size. These sizes can vary massively as using `MaxDownloadSize` will
                     give us a size for worst case scenerio. Meaning a simple definitions update can say 1.5GB but will most likely
                     only be less than 1MB. Keep that in mind when using these methods.
@@ -197,7 +203,7 @@ pub fn scan_updates() -> Result<UpdateSummary> {
                     Now we need to convert our DECIMAL type to a u128 type. For further information on how this works go to the helper
                     function in: `tools\shugo\src\common\wmi_helpers.rs`
 
-                    Finally, we convert the u128 type to a f64 type and divide it by 1024.0 to get kilobytes (KB). Then divide it agian
+                    Finally, we convert the u128 type to a f64 type and divide it by 1024.0 to get kilobytes (KB). Then divide it again
                     by 1024.0 one more time to get megabytes (MB).
 
                     For more information on `MaxDownloadSize` and MinDownloadSize:
@@ -205,13 +211,16 @@ pub fn scan_updates() -> Result<UpdateSummary> {
                     (https://learn.microsoft.com/en-us/windows/win32/api/wuapi/nf-wuapi-iupdate-get_mindownloadsize) - MinDownloadSize
                 */
                 let min_size: DECIMAL = update.MinDownloadSize()?;
+                let max_size: DECIMAL = update.MaxDownloadSize()?;
                 let min_bytes: u128 = decimal_to_u128(min_size);
+                let max_bytes: u128 = decimal_to_u128(max_size);
                 let min_mb: f64 = min_bytes as f64 / 1024.0 / 1024.0;
+                let max_mb: f64 = max_bytes as f64 / 1024.0 / 1024.0;
 
                 /*
                     Shugo: Update Title
 
-                    Titles of updates can be grabed easily using the `Title` method and converting it to a `String` type.
+                    Titles of updates can be grabbed easily using the `Title` method and converting it to a `String` type.
 
                     For more information on `Title`:
                     (https://learn.microsoft.com/en-us/windows/win32/api/wuapi/nf-wuapi-iupdate-get_title) - C++
@@ -226,27 +235,29 @@ pub fn scan_updates() -> Result<UpdateSummary> {
                     
                     Now we'll do a for loop here for two reasons:
                     - The first is you get two categories for each update, the update classification (UpdateClassification)
-                      and the product recieving it (Product). We want to just filter the (UpdateClassification) part of our 
-                      updates so we use the `Type` method.
-                      For more information on `Type`
-                      (https://learn.microsoft.com/en-us/windows/win32/api/wuapi/nf-wuapi-icategory-get_type) - C++
+                    and the product receiving it (Product). We filter both types so we can display what's being updated
+                    and what kind of update it is.
+                    For more information on `Type`:
+                    (https://learn.microsoft.com/en-us/windows/win32/api/wuapi/nf-wuapi-icategory-get_type) - C++
 
                     - The second reason is so we can grab a count of how many classifications of each type we have. Each 
-                      (UpdateClassification) is tied to a GUID from Windows, this makes it easy to filter the classifications
-                      using the `CategoryID` method.
-                      For more information on `CategoryID`:
-                      (https://learn.microsoft.com/en-us/windows/win32/api/wuapi/nf-wuapi-icategory-get_categoryid)
+                    (UpdateClassification) is tied to a GUID from Windows, this makes it easy to filter the classifications
+                    using the `CategoryID` method.
+                    For more information on `CategoryID`:
+                    (https://learn.microsoft.com/en-us/windows/win32/api/wuapi/nf-wuapi-icategory-get_categoryid) - C++
                 */
                 let categories: ICategoryCollection = update.Categories()?;
                 let mut classification: Option<String> = None; // Classification variable
+                let mut product: Option<String> = None;
 
                 for j in 0..categories.Count()? { 
                     let category: ICategory = categories.get_Item(j)?;
+                    
                     if category.Type()? == "UpdateClassification" {
                        
                         classification = Some(category.Name()?.to_string());  // Grabbing the classification Name
 
-                        let id = category.CategoryID()?; // ID of the classification
+                        let id: BSTR = category.CategoryID()?; // ID of the classification
 
                         // Grabbing count of classification type
                         if id == CRITICAL_UPDATES_GUID {
@@ -262,14 +273,30 @@ pub fn scan_updates() -> Result<UpdateSummary> {
                         } else {
                             other_count += 1;
                         }
+                    } else if category.Type()? == "Product" {
+                        product = Some(category.Name()?.to_string());
                     }
                 }
 
-                if let Some(classification) = classification {
+                /*
+                    Shugo: Update Description
+
+                    Using the `Description` method we can grab the description of the update from Windows Update Agent.
+                    This should always be filled and should never return empty.
+
+                    For more information on `Description`:
+                    (https://learn.microsoft.com/en-us/windows/win32/api/wuapi/nf-wuapi-iupdate-get_description) - C++
+                */
+                let description: String = update.Description()?.to_string();
+
+                if let (Some(classification), Some(product)) = (classification, product) {
                     update_list.push(UpdateInfo { 
                         title, 
                         classification,
                         min_mb,
+                        max_mb,
+                        product,
+                        description
                     });
                 }
             }
@@ -281,7 +308,8 @@ pub fn scan_updates() -> Result<UpdateSummary> {
                 feature_count: feature_count,
                 driver_count: driver_count,
                 other_count: other_count, 
-                update_list
+                update_list,
+                query: search_criteria.to_string() 
             };
         }
         /*
