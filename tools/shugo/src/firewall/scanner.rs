@@ -1,3 +1,14 @@
+//! This is the Firewall Module for Shugo. We are able to see
+//! 
+//! - Windows Firewall Profile States (Public, Private, Domain)
+//! - Third-Party Firewall Products
+//! - Firewall Product Status
+//! 
+//! This module uses TWO different APIs:
+//! 1. Windows Firewall Policy API (INetFwPolicy2) - For Windows Defender Firewall profiles
+//! 2. WMI SecurityCenter2 - For third-party firewall products
+//! 
+//! Note: The profile states ONLY reflect Windows Defender Firewall, not third-party firewalls.
 use windows::core::*;
 use windows::Win32::Foundation::*;
 use windows::Win32::System::Com::*;
@@ -7,125 +18,233 @@ use windows::Win32::NetworkManagement::WindowsFirewall::*;
 use crate::common::wmi_helpers::{string_property, integer_property};
 
 pub struct WindowsFirewallProfile {
-    pub public: bool,
-    pub private: bool,
-    pub domain: bool
+    pub public: FirewallProfileDetails,
+    pub private: FirewallProfileDetails,
+    pub domain: FirewallProfileDetails
+}
+
+pub struct FirewallProfileDetails {
+    pub profile_enabled: bool,
+    pub inbound_blocked: bool,
+    pub outbound_blocked: bool,
+    pub notifications_disabled: bool
+
 }
 
 pub struct FirewallProductInfo {
     pub name: String,
     pub state: i32,
-    pub is_active: bool
+}
+
+pub struct ModuleInfo {
+    pub namespace: String,
+    pub query: String
 }
 
 /// Grabing firewall for Windows
-pub fn scan_firewall() -> Result<(WindowsFirewallProfile, Vec<FirewallProductInfo>)> {
-    /* 
-        WARDEN - Firewall Module
-
-        This module is closely similar to the Antivirus Module. So similar that I copied the logic of the antivirus product and changed a single argument.
-        The Firewall module is also one of the easiest to make and understand.
-    */
+pub fn scan_firewall() -> Result<(WindowsFirewallProfile, Vec<FirewallProductInfo>, ModuleInfo)> {
     unsafe {
+        /* 
+            Shugo: COM Library Initialization
 
+            Just like in the Antivirus and Update Modules, we need to initialize COM before using 
+            any Windows APIs.
+        */
         let _com: HRESULT = CoInitializeEx(None, COINIT_MULTITHREADED);
-        if _com.is_err() {
-            println!("Error with COM initilaization in Firewall module");
-            return Err(_com.into());
+        match _com { 
+            S_OK => {
+                // COM initialized successfully
+            },
+            E_OUTOFMEMORY => {
+                // Memory problem occured
+                println!("COM initialization failed: Out of memory");
+                return Err(_com.into());
+            },
+            E_INVALIDARG => {
+                // Invalid argument was passed
+                println!("COM initialization failed: Invalid argument");
+                return Err(_com.into());
+            },
+            E_UNEXPECTED => {
+                // Something unexpected happened
+                println!("COM initialization failed: Unexpected error");
+                return Err(_com.into());
+            }
+            _ => {
+                println!("COM initialization failed with HRESULT: 0x{:?}", _com);
+                return Err(_com.into());
+            }
         }
         
         let firewalls: WindowsFirewallProfile;
         let mut firewall_products: Vec<FirewallProductInfo> = Vec::new();
+        let module: ModuleInfo;
 
         {
-            // We have to connect to the INetFwPolicy interface
-            // for more info on 'INetFwPolicy2': https://learn.microsoft.com/en-us/windows/win32/api/netfw/nn-netfw-inetfwpolicy2
+            /*
+                Shugo: Windows Firewall Policy Interface
+
+                Unlike the Antivirus and Update modules which use WMI or WUA, we can access 
+                Windows Firewall settings directly through the INetFwPolicy2 interface.
+
+                We use CLSCTX_ALL here because the firewall service may run in a different
+                process, similar to the Windows Update service.
+
+                For more information on `INetFwPolicy2`:
+                (https://learn.microsoft.com/en-us/windows/win32/api/netfw/nn-netfw-inetfwpolicy2) - C++
+            */
             let policy: INetFwPolicy2 = CoCreateInstance(&NetFwPolicy2, None, CLSCTX_ALL)?;
 
-            // And just like that we are allowed access into the firewall policy
-            let public_fw = {
-                // We first use the 'get_FirewallEnabled' method with the profiletype we want as an arg
-                let firewall = policy.get_FirewallEnabled(NET_FW_PROFILE2_PUBLIC)?;
-                // Then we want to turn the VARIANT_BOOL we get to a Rust bool by using the VARIANT_TRUE method
-                // There is a VARIANT_FALSE so don't get them confused
-                firewall == VARIANT_TRUE
+            /*
+                Shugo: Checking Firewall Profile States
+
+                Windows Firewall has three network profiles:
+                - Public: Used for untrusted networks (coffee shops, airports)
+                - Private: Used for trusted home/work networks
+                - Domain: Used when connected to a corporate domain
+
+                Each profile can be independently enabled or disabled. We check each one using 
+                `get_FirewallEnabled` with the appropriate profile type constant.
+
+                We then check to see the state of inbound and outbound traffic from the profiles
+                using `get_DefaultInboundAction` and `get_DefaultOutboundAction`.
+
+                After that, we see if notifications are disabled using `get_NotificationsDisabled`
+
+                IMPORTANT: These states only reflect Windows Defender Firewall. Third-party 
+                firewalls (Norton, McAfee) are tracked separately through WMI.
+            */
+            let public_details: FirewallProfileDetails = {
+                let profiletype: NET_FW_PROFILE_TYPE2 = NET_FW_PROFILE2_PUBLIC;
+
+                let profile_enabled: bool = policy.get_FirewallEnabled(profiletype)? == VARIANT_TRUE;
+                let inbound_blocked: bool = policy.get_DefaultInboundAction(profiletype)? == NET_FW_ACTION_BLOCK;
+                let outbound_blocked: bool = policy.get_DefaultOutboundAction(profiletype)? == NET_FW_ACTION_BLOCK;
+                let notifications_disabled: bool = policy.get_NotificationsDisabled(profiletype)? == VARIANT_TRUE;
+
+                FirewallProfileDetails {
+                    profile_enabled,
+                    inbound_blocked,
+                    outbound_blocked,
+                    notifications_disabled
+
+                }
             };
 
-            // And Thats it, now you can see the status of different profiles types
-            // NOTE: This seems to only grab information of Windows Defenders Profiles, Not a third party Firewall
-            // for example, you can turn off the Windows Defender firewall and it will show off on the checks
-            // but a third party software will still have their firewall active.
+            let private_details: FirewallProfileDetails = {
+                let profiletype: NET_FW_PROFILE_TYPE2 = NET_FW_PROFILE2_PRIVATE;
 
-            let private_fw = {
-                let firewall = policy.get_FirewallEnabled(NET_FW_PROFILE2_PRIVATE)?;
-                firewall == VARIANT_TRUE
+                let profile_enabled: bool = policy.get_FirewallEnabled(profiletype)? == VARIANT_TRUE;
+                let inbound_blocked: bool = policy.get_DefaultInboundAction(profiletype)? == NET_FW_ACTION_BLOCK;
+                let outbound_blocked: bool = policy.get_DefaultOutboundAction(profiletype)? == NET_FW_ACTION_BLOCK;
+                let notifications_disabled: bool = policy.get_NotificationsDisabled(profiletype)? == VARIANT_TRUE;
+
+                FirewallProfileDetails {
+                    profile_enabled,
+                    inbound_blocked,
+                    outbound_blocked,
+                    notifications_disabled
+
+                }
             };
 
-            let domain_fw = {
-                let firewall = policy.get_FirewallEnabled(NET_FW_PROFILE2_DOMAIN)?;
-                firewall == VARIANT_TRUE
+            let domain_details: FirewallProfileDetails = {
+                let profiletype: NET_FW_PROFILE_TYPE2 = NET_FW_PROFILE2_DOMAIN;
+
+                let profile_enabled: bool = policy.get_FirewallEnabled(profiletype)? == VARIANT_TRUE;
+                let inbound_blocked: bool = policy.get_DefaultInboundAction(profiletype)? == NET_FW_ACTION_BLOCK;
+                let outbound_blocked: bool = policy.get_DefaultOutboundAction(profiletype)? == NET_FW_ACTION_BLOCK;
+                let notifications_disabled: bool = policy.get_NotificationsDisabled(profiletype)? == VARIANT_TRUE;
+
+                FirewallProfileDetails {
+                    profile_enabled,
+                    inbound_blocked,
+                    outbound_blocked,
+                    notifications_disabled
+
+                }
             };
 
             firewalls = WindowsFirewallProfile {
-                public: public_fw,
-                private: private_fw,
-                domain: domain_fw
+                public: public_details,
+                private: private_details,
+                domain: domain_details
             };
 
-            // Now if you want to grab the name of the different Firewall Products you have like the Antivirus module, we can reuse our Antivirus code here
-            // logic from antivirus module
+            /*
+                Shugo: Third-Party Firewall Products via WMI
+
+                Now we'll query WMI's SecurityCenter2 namespace to find third-party firewall products.
+                This logic is nearly identical to the Antivirus Module, we just query "FirewallProduct"
+                instead of "AntiVirusProduct".
+
+                This lets us see products like Norton Firewall, Avast, etc.
+            */
             let locator: IWbemLocator = CoCreateInstance(&WbemLocator, None, CLSCTX_INPROC_SERVER)?;
-            let namespace_path = BSTR::from("ROOT\\SecurityCenter2");
-            let services = locator.ConnectServer(
-                &namespace_path, // This is the pointer to the specified namespace. This requires a valid BSTR
-                &BSTR::default(), // This is for a user name for the connection, we'll use '&BSTR::default()' as NULL for this pointer. Their might be a "right way" to do this
-                &BSTR::default(), // This is for a password for the connection
-                &BSTR::default(), // This is for local
-                0, // This is for flags. we'll use '0' for this value because it will return the call from 'ConnectServer' only after its established
-                &BSTR::default(), // This can contain the name of the domain of the user to authenticate
-                None // This is usually NULL
+            let namespace_path: BSTR = BSTR::from("ROOT\\SecurityCenter2");
+            let services: IWbemServices = locator.ConnectServer(
+                &namespace_path, 
+                &BSTR::default(),
+                &BSTR::default(),
+                &BSTR::default(),
+                0,
+                &BSTR::default(),
+                None
             )?;
 
-            // THIS IS THE LINE, instead of using AntiVirusProduct we use FirewallProduct
-            let query = BSTR::from("Select displayName, productState FROM FirewallProduct");
+            let query: BSTR = BSTR::from("Select displayName, productState FROM FirewallProduct");
             let enum_object = services.ExecQuery(
-                &BSTR::from("WQL"), // This specifies the query language to use supported by Windows and it MUST be "WQL". Windows says that not me
-                &query, // This is where the query search will go. It cannot be NULL...why are you trying to search for nothing
-                WBEM_FLAG_RETURN_IMMEDIATELY | WBEM_FLAG_FORWARD_ONLY, // This is where flags go and they affect the behavior of this method.
-                None // This is usually NULL
+                &BSTR::from("WQL"),
+                &query,
+                WBEM_FLAG_RETURN_IMMEDIATELY | WBEM_FLAG_FORWARD_ONLY, 
+                None 
             )?;
 
+            /*
+                Shugo: Processing Firewall Products
+
+                Just like antivirus products, firewall products also use the productState hexadecimal 
+                format. We extract bits 12-15 to determine if the firewall is active.
+            */
             loop { 
-                let mut objects = [None; 1];
+                let mut objects: [Option<IWbemClassObject>; 1] = [None; 1];
                 let mut returned = 0;
                 let _ = enum_object.Next(
-                    WBEM_INFINITE, // This specifies the maximum amount of time in milliseconds that the call blocks before returning. Just stole this line from the page
-                    &mut objects, // This should point to a storage to hold the number of IWbemClassObject interface pointers specified by uCount
-                    &mut returned // This receives the number of objects returned.
+                    WBEM_INFINITE, 
+                    &mut objects,
+                    &mut returned 
                 );
                 if returned == 0 {
                     break;
                 }
 
                 if let Some(class_object) = &objects[0] {
-                    // Check out common/wmi_helpers.rs to see how these functions work
-                    let fw_name = string_property(class_object, "displayName")?;
-                    let fw_state = integer_property(class_object, "productState")?;
-
-                    // The firewall product also uses hexadecimal so we can decipher information like the Antivirus module
-                    let fw_active = ((fw_state >> 12) & 0xF) != 0;
-
-                    let product = FirewallProductInfo {
-                        name: fw_name,
-                        state: fw_state,
-                        is_active: fw_active
+                    let name: String = string_property(class_object, "displayName")?;
+                    let state: i32 = integer_property(class_object, "productState")?;
+                    
+                    let product: FirewallProductInfo = FirewallProductInfo {
+                        name,
+                        state,
                     };
 
                     firewall_products.push(product);
                 }
             }
+
+            module = ModuleInfo {
+                namespace: namespace_path.to_string(), 
+                query: query.to_string()
+            }
         }
+        /*
+            Shugo: Closing Thread
+
+            Clean up COM when we're done.
+
+            For more information on `CoUninitialize`:
+            (https://learn.microsoft.com/en-us/windows/win32/api/combaseapi/nf-combaseapi-couninitialize) - C++
+        */
         CoUninitialize();
-        Ok((firewalls, firewall_products))
+        Ok((firewalls, firewall_products, module))
     }
 }
