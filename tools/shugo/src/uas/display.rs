@@ -2,6 +2,7 @@ use super::scanner::UserAccountSummary;
 use crate::common::time::get_time;
 
 pub fn display_uas(info: UserAccountSummary, verbose: bool) {
+    println!();
     println!("USER ACCOUNT SECURITY AUDIT");
     println!("{}", "=".repeat(30));
 
