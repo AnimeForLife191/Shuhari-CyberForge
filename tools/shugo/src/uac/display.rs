@@ -2,6 +2,7 @@ use super::scanner::UacInfo;
 use crate::common::time::get_time;
 
 pub fn display_uac(info: UacInfo, verbose: bool) {
+    println!();
     println!("USER ACCOUNT CONTROL STATUS");
     println!("{}", "=".repeat(30));
 
