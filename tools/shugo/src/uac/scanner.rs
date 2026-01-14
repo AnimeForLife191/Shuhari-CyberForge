@@ -2,9 +2,14 @@
 //! 
 //! - UAC Enable/Disable Status
 //! - Prompt Behavior Level
+//! - Secure Desktop level
+//! - Installer Detection level
+//! - Code Signature level
+//! - Filter Administration Token level
+//! - Enable Virtualization level
 //! 
 //! Unlike the other modules, this one accesses the Windows Registry directly 
-//! instead of using COM/WMI APIs. The Registry is Windows Hierarchical database for 
+//! instead of using COM/WMI APIs. The Registry is Windows Heirarchical database for 
 //! system configuration settings.
 use windows::core::*;
 use windows::Win32::Foundation::*;
