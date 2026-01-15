@@ -1,5 +1,5 @@
 [workspace]
-members = ["cli", "tools/orion", "tools/shugo"]
+members = ["cli", "tools/takeri", "tools/shugo"]
 
 resolver = "3"
 
