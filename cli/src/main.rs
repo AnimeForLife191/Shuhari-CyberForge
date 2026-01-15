@@ -15,11 +15,13 @@ use shugo::{
     display_uas
 };
 
+/// Shuhari-CyberForge: Experimental security tools for educational purposes
 #[derive(Parser)]
 struct Cli {
     #[command(subcommand)]
     command: Command,
 
+    /// Gives a more detailed output
     #[arg(short, long, global = true)]
     verbose: bool
 }
@@ -28,21 +30,27 @@ struct Cli {
 #[derive(Subcommand)]
 enum Command {
     #[command(subcommand)]
-    Shugo(ShugoCommand) // Shugo tool
+    /// The Windows Security Audit and Educator
+    Shugo(ShugoCommand)
 }
 
 // This is the subcommands for Shugo
 #[derive(Subcommand)]
 enum ShugoCommand {
-    Antivirus, // Shugo antivirus subcommand
-    Updates, // Shugo updates subcommand
-    Firewall, // Shugo firewall subcommand
-    Uac, // Shugo uac (User Account Control) subcommand
-    Uas // Shugo uas (User Account Security) subcommand
+    /// Shows current and third-party antivirus's and their states
+    Antivirus,
+    /// Shows pending updates, sizes, product, classification, and description
+    Updates,
+    /// Shows Windows Defender profiles, third-party firewalls, and their states
+    Firewall,
+    /// Shows UAC (User Access Control) settings
+    Uac,
+    /// Shows UAS (User Access Security) settings
+    Uas
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let cli = Cli::parse();
+    let cli: Cli = Cli::parse();
 
     match cli.command {
         Command::Shugo(wcmd) => match wcmd {
