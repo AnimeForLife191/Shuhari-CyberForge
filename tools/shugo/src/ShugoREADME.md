@@ -8,7 +8,9 @@
 ### Security Audit
 - **Antivirus Detection** - Lists all installed AV products with real-time protection and definition status
 - **Firewall Verification** - Checks Windows Firewall profiles and third-party firewall products
-- **Update Identification** - Shows pending Windows updates with classification (Critical, Security, etc.) and sizes
+- **Update Identification** - Shows pending Windows updates with classification (Critical, Security, etc.), sizes, and descriptions
+- **UAC Settings** - Shows UAC (User Access Control) Status, Prompt Level, and other related checks
+- **UAS Settings** - Shows UAS (User Acount Security) account types, account status, and security risks
 
 ### Technical Advantages
 - **Native Performance** - Direct Windows API calls (COM/WMI)
@@ -30,18 +32,22 @@ Executable will be at `target\release\Shuhari-CyberForge-cli.exe`
 
 Run from the project directory after building:
 ```bash
-.\target\release\shuhari-cyberforge-cli.exe shudo antivirus -v
+.\target\release\shuhari-cyberforge-cli.exe shugo antivirus -v
 ```
 
 Available commands:
-- `shudo antivirus` - Check antivirus status
-- `shudo firewall` - Check firewall configuration
-- `shudo updates` - Check Windows Update status
+- `shugo antivirus` - Check antivirus status
+- `shugo firewall` - Check firewall configuration
+- `shugo updates` - Check Windows Update status
+- `shugo uac` - Check UAC (User Account Control) settings
+- `shugo uas` - Check UAS (User Account Security) settings
 
 Add `-v` for verbose output with technical details.
 
 **Example output:**
 ```
+\shahari-cyberforge-cli.exe shugo antivirus -v
+
 ANTIVIRUS PROTECTION AUDIT
 ==============================
 Scan Details:
@@ -51,18 +57,29 @@ Scan Details:
 
 Summary:
  - Products Found: 1
- - Active: 1/1
- - Real-time Protection: 1/1
- - Definitions Updated: 1/1
+   - Products Inactive: 0
+   - Products Active: 1
+   - Products Snoozed: 0
+   - Products Expired: 0
 
 Product Details:
-
 1. Windows Defender
- - Status: Active
- - Real-time: Enabled
+ - Status: On
+   - Hex Value (0x0F000): 1
+ - Third-Party: No
+   - Hex Value (0x00F00): 1
  - Definitions: Up-to-date
- - Product Hexadecimal State: 0x61100
- - Product Raw State: 397568
+   - Hex Value (0x000F0): 0
+ - Product State: 397568
+ - Hexadecimal State: 0x61100
+
+Security Assessment:
+ - Antivirus Protection:
+   - Antivirus Protection Is Active
+
+ - Active Products:
+   - Windows Defender
+     - Definitions: Up-to-date
 
 Technical Information:
  - COM Apartment: MTA (Multi-threaded)
