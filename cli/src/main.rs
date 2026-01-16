@@ -1,21 +1,27 @@
 use clap::{Parser, Subcommand};
 
-use warden::{
+use shugo::{
     scan_antivirus, 
     scan_updates, 
-    scan_firewall
+    scan_firewall,
+    scan_uac,
+    scan_uas
 };
-use warden::{
+use shugo::{
     display_antivirus, 
     display_updates,
-    display_firewalls
+    display_firewalls,
+    display_uac,
+    display_uas
 };
 
+/// Shuhari-CyberForge: Experimental security tools for educational purposes
 #[derive(Parser)]
 struct Cli {
     #[command(subcommand)]
     command: Command,
 
+    /// Gives a more detailed output
     #[arg(short, long, global = true)]
     verbose: bool
 }
@@ -24,25 +30,35 @@ struct Cli {
 #[derive(Subcommand)]
 enum Command {
     #[command(subcommand)]
-    Warden(WardenCommand) // WARDEN tool
+    /// The Windows Security Audit and Educator
+    Shugo(ShugoCommand)
 }
 
-// This is the subcommands for WARDEN
+// This is the subcommands for Shugo
 #[derive(Subcommand)]
-enum WardenCommand {
-    Antivirus, // WARDEN antivirus subcommand
-    Updates, // WARDEN updates subcommand
-    Firewall // WARDEN firewall subcommand
+enum ShugoCommand {
+    /// Shows current and third-party antivirus's and their states
+    Antivirus,
+    /// Shows pending updates, sizes, product, classification, and description
+    Updates,
+    /// Shows Windows Defender profiles, third-party firewalls, and their states
+    Firewall,
+    /// Shows UAC (User Access Control) settings
+    Uac,
+    /// Shows UAS (User Access Security) settings
+    Uas
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let cli = Cli::parse();
+    let cli: Cli = Cli::parse();
 
     match cli.command {
-        Command::Warden(wcmd) => match wcmd {
-            WardenCommand::Antivirus => display_antivirus(&scan_antivirus()?, cli.verbose),
-            WardenCommand::Updates => display_updates(scan_updates()?, cli.verbose),
-            WardenCommand::Firewall => display_firewalls(scan_firewall()?, cli.verbose),
+        Command::Shugo(wcmd) => match wcmd {
+            ShugoCommand::Antivirus => display_antivirus(&scan_antivirus()?, cli.verbose),
+            ShugoCommand::Updates => display_updates(scan_updates()?, cli.verbose),
+            ShugoCommand::Firewall => display_firewalls(scan_firewall()?, cli.verbose),
+            ShugoCommand::Uac => display_uac(scan_uac()?, cli.verbose),
+            ShugoCommand::Uas => display_uas(scan_uas()?, cli.verbose),
         }
     }
     Ok(())

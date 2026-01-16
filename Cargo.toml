@@ -1,5 +1,5 @@
 [workspace]
-members = ["cli", "tools/orion", "tools/warden"]
+members = ["cli", "tools/takeri", "tools/shugo"]
 
 resolver = "3"
 
@@ -11,6 +11,8 @@ windows = {version = ">=0.59, <=0.62", features = [
     "Win32_System_Wmi",
     "Win32_System_Ole",
     "Win32_System_Variant",
-    "Win32_NetworkManagement_WindowsFirewall"
+    "Win32_System_Registry",
+    "Win32_NetworkManagement_WindowsFirewall",
+    "Win32_NetworkManagement_NetManagement"
 ]}
 clap = {version = "4.5.53", features = ["derive"]}

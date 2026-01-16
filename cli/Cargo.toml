@@ -1,8 +1,8 @@
 [package]
-name = "sysdefense-cli"
+name = "shahari-cyberforge-cli"
 version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-warden = {path = "../tools/warden"}
+shugo = {path = "../tools/shugo"}
 clap.workspace = true
