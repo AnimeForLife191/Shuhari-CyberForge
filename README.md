@@ -2,7 +2,7 @@
 
 **Community-Powered Cybersecurity**
 
-[![License: MIT](https://img.shields.io/badge/License-MIT%20-lightgrey.svg)](https://opensource.org/license/mit)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache2.0%20-lightgrey.svg)](https://www.apache.org/licenses/LICENSE-2.0)
 [![Rust](https://img.shields.io/badge/rust-1.92%2B-orange.svg)](https://www.rust-lang.org)
 [![Platform](https://img.shields.io/badge/platform-Windows-blue.svg)](https://www.microsoft.com/windows)
 
