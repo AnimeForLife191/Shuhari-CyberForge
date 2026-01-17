@@ -65,9 +65,9 @@ pub fn scan_uas() -> Result<UserAccountSummary> {
             &mut total_entries, // total entries available
             Some(&mut resume_handle) // Resume handle to continue existing search
         );
-        if result != NERR_Success {
-            println!("NetUserEnum failed with error:");
-            return Err(Error::from_hresult(HRESULT(result as i32)));
+        if result == NERR_Success {
+            let error: HRESULT = HRESULT(result as i32);
+            return Err(Error::from(error));
         }
 
         /*
