@@ -1,8 +1,11 @@
+#![cfg(target_os = "windows")]
 use std::mem::MaybeUninit;
-use windows::core::*;
-use windows::Win32::System::Variant::*;
-use windows::Win32::System::Wmi::*;
-use windows::Win32::Foundation::*;
+use windows::{
+    core::*,
+    Win32::System::Variant::*,
+    Win32::System::Wmi::*,
+    Win32::Foundation::*,
+};
 
 /// Converting BSTR to a Rust String
 pub fn string_property(obj: &IWbemClassObject, name: &str) -> Result<String> {
@@ -155,6 +158,7 @@ pub fn integer_property(obj: &IWbemClassObject, name: &str) -> Result<i32> {
 
     This gives us the complete 96-bit integer value as a u128.
 */
+
 pub fn decimal_to_u128(decimal: DECIMAL) -> u128 {
     unsafe {((decimal.Hi32 as u128) << 64) | (decimal.Anonymous2.Lo64 as u128)}
 }

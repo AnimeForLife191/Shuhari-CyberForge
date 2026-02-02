@@ -1,3 +1,4 @@
+#![cfg(target_os = "windows")]
 mod antivirus;
 mod updates;
 mod firewall;

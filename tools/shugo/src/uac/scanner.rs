@@ -11,9 +11,12 @@
 //! Unlike the other modules, this one accesses the Windows Registry directly 
 //! instead of using COM/WMI APIs. The Registry is Windows Heirarchical database for 
 //! system configuration settings.
-use windows::core::*;
-use windows::Win32::Foundation::*;
-use windows::Win32::System::Registry::*;
+
+#![cfg(target_os = "windows")]
+use windows::{core::*,
+    Win32::Foundation::*,
+    Win32::System::Registry::*
+};
 
 pub struct UacInfo {
     pub lua_value: u32,

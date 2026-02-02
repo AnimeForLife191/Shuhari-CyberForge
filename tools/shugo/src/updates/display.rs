@@ -1,7 +1,9 @@
+#[cfg(target_os = "windows")]
 use super::scanner::UpdateSummary;
 use crate::common::time::get_time;
 
 /// Display for Update Module
+#[cfg(target_os = "windows")]
 pub fn display_updates(update: UpdateSummary, verbose: bool) {
     println!();
     println!("UPDATES PENDING AUDIT");
@@ -60,6 +62,7 @@ pub fn display_updates(update: UpdateSummary, verbose: bool) {
     if verbose {display_technical();}
 }
 
+#[cfg(target_os = "windows")]
 fn display_scan_details(update: &UpdateSummary) {
     let (h, m, s) = get_time();
 
@@ -70,6 +73,7 @@ fn display_scan_details(update: &UpdateSummary) {
     println!();
 }
 
+#[cfg(target_os = "windows")]
 fn display_summary(update: &UpdateSummary, verbose: bool) {
     println!("Summary:");
     if update.total_count == 0 {
@@ -90,6 +94,7 @@ fn display_summary(update: &UpdateSummary, verbose: bool) {
     println!();
 }
 
+#[cfg(target_os = "windows")]
 fn update_display(update: &UpdateSummary, verbose: bool, count: i32, class: &str, header: &str) {
     if count == 0 {
         return;
@@ -111,6 +116,7 @@ fn update_display(update: &UpdateSummary, verbose: bool, count: i32, class: &str
     }
 }
 
+#[cfg(target_os = "windows")]
 fn other_updates(update: &UpdateSummary, verbose: bool, count: i32, header: &str) {
     if count == 0 {
         return;
@@ -142,6 +148,7 @@ fn other_updates(update: &UpdateSummary, verbose: bool, count: i32, header: &str
     }
 }
 
+#[cfg(target_os = "windows")]
 fn display_technical() {
     println!("Technical Information:");
     println!(" - COM Apartment: MTA (Multi-threaded)");

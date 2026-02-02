@@ -9,12 +9,14 @@
 //! 2. WMI SecurityCenter2 - For third-party firewall products
 //! 
 //! Note: The profile states ONLY reflect Windows Defender Firewall, not third-party firewalls.
-use windows::core::*;
-use windows::Win32::Foundation::*;
-use windows::Win32::System::Com::*;
-use windows::Win32::System::Wmi::*;
-use windows::Win32::NetworkManagement::WindowsFirewall::*;
 
+#![cfg(target_os = "windows")]
+use windows::{core::*,
+    Win32::Foundation::*,
+    Win32::System::Com::*,
+    Win32::System::Wmi::*,
+    Win32::NetworkManagement::WindowsFirewall::*
+};
 use crate::common::wmi_helpers::{string_property, integer_property};
 
 pub struct WindowsFirewallProfile {

@@ -13,11 +13,13 @@
 //! Note: Depending on your network and computer hardware, Scanning for updates can 
 //! take around 5-30 seconds as it queries Microsoft's servers.
 
-use windows::Win32::System::Com::*;
-use windows::Win32::System::UpdateAgent::*;
-use windows::Win32::Foundation::*;
-use windows::core::*;
-
+#![cfg(target_os = "windows")]
+use windows::{
+    core::*,
+    Win32::System::Com::*,
+    Win32::System::UpdateAgent::*,
+    Win32::Foundation::*
+};
 use crate::common::wmi_helpers::decimal_to_u128;
 
 pub struct UpdateInfo {

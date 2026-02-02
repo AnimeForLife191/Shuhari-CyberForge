@@ -7,8 +7,12 @@
 //! 
 //! This module uses the NetUserEnum API to enumerate all local user accounts
 //! and analyze their security configurations.
-use windows::core::*;
-use windows::Win32::NetworkManagement::NetManagement::*;
+
+#![cfg(target_os = "windows")]
+use windows::{
+    core::*,
+    Win32::NetworkManagement::NetManagement::*
+};
 
 pub struct UserAccountInfo {
     pub username: String,
