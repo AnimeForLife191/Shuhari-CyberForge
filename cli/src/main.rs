@@ -1,14 +1,13 @@
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
+#[cfg(target_os = "windows")]
 use shugo::{
     scan_antivirus, 
     scan_updates, 
     scan_firewall,
     scan_uac,
-    scan_uas
-};
-use shugo::{
+    scan_uas,
     display_antivirus, 
     display_updates,
     display_firewalls,
@@ -37,14 +36,17 @@ struct Cli {
 // This is where tools can be added to the CLI and be given subcommands
 #[derive(Subcommand)]
 enum Command {
+    #[cfg(target_os = "windows")]
     #[command(subcommand)]
     /// The Windows Security Audit and Educator
     Shugo(ShugoCommand),
+
     #[command(subcommand)]
     Takeri(TakeriCommand)
 }
 
 // This is the subcommands for Shugo
+#[cfg(target_os = "windows")]
 #[derive(Subcommand)]
 enum ShugoCommand {
     /// Shows current and third-party antivirus's and their states
@@ -78,6 +80,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli: Cli = Cli::parse();
 
     match cli.command {
+        #[cfg(target_os = "windows")]
         Command::Shugo(scmd) => match scmd {
             ShugoCommand::Antivirus => display_antivirus(&scan_antivirus()?, cli.verbose),
             ShugoCommand::Updates => display_updates(scan_updates()?, cli.verbose),
