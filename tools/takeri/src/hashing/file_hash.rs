@@ -1,6 +1,5 @@
-//! This is the Hash Module for Takeri. This is mostly a helper module 
-//! for the Malware Scanner in Takeri but we'll also be using it as a 
-//! way to scan files individualy.
+//! This is the Hash Module for Takeri. This is where we can hash
+//! specific files.
 //! 
 //! We are able to:
 //! 
@@ -93,7 +92,6 @@ fn calculator<D: Digest>(path: &Path, algorithm: &str) -> Result<Hash, Error> {
     })
 }
 
-/// User Chooses Hash
 pub fn hash_selector(algorithm: &str, path: &Path) -> Result<Hash, Error> {
     if path.is_dir() {
         return Err(Error::new(
