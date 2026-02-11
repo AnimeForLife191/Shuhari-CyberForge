@@ -1,7 +1,6 @@
-pub mod hash;
+pub mod signature_scan;
+pub mod hashing;
+pub mod common;
 
-pub use hash::{
-    calculator::hash_selector,
-    display::{display_file_hash, display_directory_hash},
-    directory::hash_directory
-};
+pub use hashing::directory::hash_directory;
+pub use signature_scan::display::init_scan;

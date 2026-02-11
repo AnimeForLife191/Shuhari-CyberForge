@@ -16,10 +16,7 @@ use shugo::{
 };
 
 use takeri::{
-    hash_selector,
-    hash_directory,
-    display_file_hash,
-    display_directory_hash
+    init_scan,
 };
 
 /// Shuhari-CyberForge: Experimental security tools for educational purposes
@@ -64,15 +61,25 @@ enum ShugoCommand {
 
 #[derive(Subcommand)]
 enum TakeriCommand {
-    Hash{
-        path: PathBuf,
+    // Hash {
+        // path: PathBuf,
 
-        #[arg(short, long, default_value = "md5")]
-        algorithm: String,
+        // #[arg(short, long, default_value = "md5")]
+        // algorithm: String,
+
+        // #[arg(short, long)]
+        // recursive: bool,
+
+        // #[arg(short, long)]
+        // output: PathBuf
+    // },
+
+    Scan {
+        path: PathBuf,
 
         #[arg(short, long)]
         recursive: bool
-    }
+    },
 }
 
 
@@ -89,13 +96,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             ShugoCommand::Uas => display_uas(scan_uas()?, cli.verbose),
         }
         Command::Takeri(tcmd) => match tcmd {
-            TakeriCommand::Hash {algorithm, path, recursive} => if path.is_file() {
-                display_file_hash(hash_selector(&algorithm, &path)?)
-            } else {
-                display_directory_hash(hash_directory(&path, &algorithm, recursive)?);
-            }
-            //TakeriCommand::Scan { directory, algorithm, recursive } => display_directory(scan_directory(&directory, &algorithm, recursive)?),
-        //}
+            TakeriCommand::Scan { path, recursive } => init_scan(&path, recursive, cli.verbose)?,
         }
     }
     Ok(())
