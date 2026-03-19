@@ -16,7 +16,7 @@ use shugo::{
 };
 
 use takeri::{
-    init_scan,
+    init_scan 
 };
 
 /// Shuhari-CyberForge: Experimental security tools for educational purposes
