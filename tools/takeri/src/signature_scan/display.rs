@@ -1,8 +1,8 @@
 use std::path::Path;
 
-use super::updater::init_cvd;
-use super::cvd_reader::{cvd_file_reader, SignatureDb};
-use super::scanner::{MalwareScanner, ScanResult, DirectoryScanResult};
+use crate::scanner::cvd::cvd_reader::SignatureDb;
+use crate::scanner::scanner::{ScanResult, DirectoryScanResult, init_scanner};
+
 
 pub fn init_scan(path: &Path, recursive: bool, verbose: bool) -> Result<(), Box<dyn std::error::Error>> {
     println!("Malware Scan");
@@ -12,14 +12,7 @@ pub fn init_scan(path: &Path, recursive: bool, verbose: bool) -> Result<(), Box<
         scan_details_display(&path, recursive);
     }
 
-    let cvd_path = init_cvd()?;
-    let db = cvd_file_reader(&cvd_path)?;
-
-    if verbose {
-        signature_db_display(&db);
-    }
-
-    let scanner = MalwareScanner::new(db);
+    let scanner = init_scanner()?;
 
     if path.is_file() {
         let result = scanner.scan_file(path)?;
@@ -42,7 +35,10 @@ fn scan_details_display (path: &Path, recursive: bool) {
 
 fn signature_db_display (db: &SignatureDb) {
     println!("Signature Database:");
-    println!(" - Signatures Loaded: {}", db.signatures.len());
+    println!(" - MD5 Signatures Loaded: {}", db.md5_signatures.len());
+    println!(" - MD5 Sizes: {}", db.md5_sizes.len());
+    println!(" - Sha256 Signatures Loaded: {}", db.sha256_signatures.len());
+    println!(" - Sha256 Sizes: {}", db.sha256_sizes.len());
     println!(" - Unique File Sizes: {}", db.all_sizes.len());
 } 
 
@@ -79,6 +75,7 @@ fn display_dir_scan(result: DirectoryScanResult, verbose: bool) {
     println!("Scan Summary:");
     println!(" - Files Scanned: {}", result.clean + result.infected.len() as usize);
     println!(" - Clean: {}", result.clean);
+    println!(" - Skipped: {}", result.skipped);
     println!(" - Infected: {}", result.infected.len());
     println!(" - Failed: {}", result.failed.len());
     println!();
