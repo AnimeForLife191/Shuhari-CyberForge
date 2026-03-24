@@ -16,7 +16,7 @@ use shugo::{
 };
 
 use takeri::{
-    init_scan 
+    scanner::display_malware_scan
 };
 
 /// Shuhari-CyberForge: Experimental security tools for educational purposes
@@ -96,7 +96,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             ShugoCommand::Uas => display_uas(scan_uas()?, cli.verbose),
         }
         Command::Takeri(tcmd) => match tcmd {
-            TakeriCommand::Scan { path, recursive } => init_scan(&path, recursive, cli.verbose)?,
+            TakeriCommand::Scan { path, recursive } => display_malware_scan(&path, recursive)?,
         }
     }
     Ok(())
