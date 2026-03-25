@@ -94,7 +94,7 @@ SUSPICIOUS FILES:
 
 INFECTED FILES DETECTED:
 
-1. /home/anime/.config/Code - OSS/User/History/-387ef922/bIYo.txt
+1. /home/{user}/.config/Code - OSS/User/History/-387ef922/bIYo.txt
    Malware: Eicar-Test-Signature
    Size: 68 bytes
 
