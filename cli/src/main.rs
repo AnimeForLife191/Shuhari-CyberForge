@@ -36,6 +36,7 @@ enum Command {
     /// The Windows Security Audit and Educator
     Shugo(ShugoCommand),
 
+    /// Malware Scanner
     #[command(subcommand)]
     Takeri(TakeriCommand)
 }
@@ -58,9 +59,11 @@ enum ShugoCommand {
 
 #[derive(Subcommand)]
 enum TakeriCommand {
+    /// Scans files and directories for signature malware
     Scan {
         path: PathBuf,
 
+        /// Scans through directories
         #[arg(short, long)]
         recursive: bool
     },
