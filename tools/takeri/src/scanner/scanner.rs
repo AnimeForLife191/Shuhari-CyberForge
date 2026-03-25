@@ -1,12 +1,13 @@
 //! Takeri Scanner Module 
 
-use rayon::iter::{ParallelBridge, ParallelIterator};
+use md5::Digest;
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use indicatif::{ProgressBar, ProgressStyle};
 use std::path::{Path, PathBuf};
 use std::fs::{File, metadata};
 use std::sync::Mutex;
-use std::io::{Error, Read};
+use std::io::{BufReader, Error, Read};
 
 use crate::common::helper::{
     calculate_md5_bytes, 
@@ -140,117 +141,36 @@ impl MalwareScanner {
                 .unwrap()  
         );
 
-        files.par_bridge().for_each(|file| {
-            let metadata = match metadata(&file) {
-                Ok(m) => m,
-                Err(e) => {
-                    failed.lock().unwrap().push((file, e));
-                    pb.inc(1);
-                    return;
-                }
-            };
+        let mut batch = Vec::with_capacity(1000);
 
-            let file_size = metadata.len();
+        for file in files {
+            batch.push(file);
 
-            if !self.db.all_sizes.contains(&file_size) {
-                skipped_count.fetch_add(1, Ordering::Relaxed);
-                pb.inc(1);
-                return;
+            if batch.len() >= 1000 {
+                self.process_batch(
+                    &batch, 
+                    &infected, 
+                    &failed, 
+                    &suspicious, 
+                    &clean_count, 
+                    &skipped_count, 
+                    &pb
+                );
+                batch.clear();
             }
+        }
 
-            // Magic Bytes
-            let ext = file.extension()
-                .and_then(|e| e.to_str())
-                .unwrap_or("");
-            let magic_buf = &self.read_magic_bytes(&file);
-            let actual_format = self.magic.identify(&magic_buf);
-            if let Some(false) = self.magic.check(ext, magic_buf) {
-                suspicious.lock().unwrap().push(SuspiciousFile {
-                    path: file.to_string_lossy().to_string(),
-                    extension: ext.to_string(),
-                    actual_format: actual_format.to_string()
-                });
-                pb.inc(1);
-                return;
-            }
-
-            let needs_md5 = self.db.md5_sizes.contains(&file_size);
-            let needs_sha256 = self.db.sha256_sizes.contains(&file_size);
-
-            let md5_hash = if needs_md5 {
-                match calculate_md5_bytes(&file) {
-                    Ok(h) => Some(h),
-                    Err(e) => {
-                        failed.lock().unwrap().push((file, e));
-                        pb.inc(1);
-                        return;
-                    }
-                }
-            } else {
-                None
-            };
-
-            let sha256_hash = if needs_sha256 {
-                match calculate_sha256_bytes(&file) {
-                    Ok(h) => Some(h),
-                    Err(e) => {
-                        failed.lock().unwrap().push((file, e));
-                        pb.inc(1);
-                        return;
-                    }
-                }
-            } else {
-                None
-            };
-
-            let mut found = false;
-
-            if let Some(hash) = md5_hash {
-                if let Some(signature_info) = self.db.md5_signatures.get(&hash) {
-                    let is_infected = match &signature_info.size {
-                        SignatureSize::Specific { size } => size.contains(&file_size),
-                        SignatureSize::Wildcard => true
-                    };
-
-                    if is_infected {
-                        infected.lock().unwrap().push(InfectedFile { 
-                            path: file.to_string_lossy().to_string(), 
-                            malware_name: signature_info.name.clone(), 
-                            hash: hex::encode(hash), 
-                            malware_size: Some(file_size) 
-                        });
-                        found = true;
-                    }
-                }
-            }
-
-            if !found {
-                if let Some(hash) = sha256_hash {
-                    if let Some(signature_info) = self.db.sha256_signatures.get(&hash) {
-                        let is_infected = match &signature_info.size {
-                            SignatureSize::Specific { size } => size.contains(&file_size),
-                            SignatureSize::Wildcard => true
-                        };
-
-                        if is_infected {
-                            infected.lock().unwrap().push(InfectedFile { 
-                                path: file.to_string_lossy().to_string(), 
-                                malware_name: signature_info.name.clone(), 
-                                hash: hex::encode(hash), 
-                                malware_size: Some(file_size) 
-                            });
-
-                            found = true
-                        }
-                    }
-                }
-            }
-
-            if !found {
-                clean_count.fetch_add(1, Ordering::Relaxed);
-            }
-            pb.inc(1);
-        });
+        if !batch.is_empty() {
+            self.process_batch(
+                &batch, 
+                &infected, 
+                &failed, 
+                &suspicious, 
+                &clean_count, 
+                &skipped_count, 
+                &pb
+            );
+        }
         pb.finish_and_clear();
 
         Ok(DirectoryScanResult { 
@@ -260,6 +180,160 @@ impl MalwareScanner {
             failed: failed.into_inner().unwrap(),
             suspicious: suspicious.into_inner().unwrap()
         })
+    }
+
+    fn process_batch(
+        &self, 
+        batch: &[PathBuf], 
+        infected: &Mutex<Vec<InfectedFile>>,
+        failed: &Mutex<Vec<(PathBuf, Error)>>,
+        suspicious: &Mutex<Vec<SuspiciousFile>>,
+        clean_count: &AtomicUsize,
+        skipped_count: &AtomicUsize,
+        pb: &ProgressBar
+    ) {
+        batch.par_iter().for_each(|file| {
+            let metadata = match metadata(&file) {
+                Ok(m) => m,
+                Err(e) => {
+                    failed.lock().unwrap().push((file.clone(), e));
+                    pb.inc(1);
+                    return;
+                }
+            };
+
+            if !metadata.is_file() {
+                skipped_count.fetch_add(1, Ordering::Relaxed);
+                pb.inc(1);
+                return;
+            }
+
+            let file_size = metadata.len();
+
+            if !self.db.all_sizes.contains(&file_size) {
+                skipped_count.fetch_add(1, Ordering::Relaxed);
+                pb.inc(1);
+                return;
+            }
+
+            let ext = file.extension()
+                .and_then(|e| e.to_str())
+                .unwrap_or("");
+
+            let needs_md5 = self.db.md5_sizes.contains(&file_size);
+            let needs_sha256 = self.db.sha256_sizes.contains(&file_size);
+            let (magic_buf, md5_hash, sha256_hash) = match self.scan_file_data(
+                &file, 
+                needs_md5, 
+                needs_sha256
+            ) {
+                Ok(data) => data,
+                Err(e) => {
+                    failed.lock().unwrap().push((file.clone(), e));
+                    pb.inc(1);
+                    return;
+                }
+            };
+
+
+            let actual_format = self.magic.identify(&magic_buf);
+
+            if let Some(false) = self.magic.check(ext, &magic_buf) {
+                suspicious.lock().unwrap().push(SuspiciousFile { 
+                    path: file.to_string_lossy().to_string(), 
+                    extension: ext.to_string(), 
+                    actual_format: actual_format.to_string() 
+                });
+                pb.inc(1);
+                return;
+            }
+
+            let mut found = false;
+
+            if let Some(hash) = md5_hash {
+                if let Some(sig) = self.db.md5_signatures.get(&hash) {
+                    infected.lock().unwrap().push(InfectedFile { 
+                        path: file.to_string_lossy().to_string(),
+                        malware_name: sig.name.clone(), 
+                        hash: hex::encode(hash), 
+                        malware_size: Some(file_size) 
+                    });
+                    found = true;
+                }
+            }
+
+            if !found {
+                if let Some(hash) = sha256_hash {
+                    if let Some(sig) = self.db.sha256_signatures.get(&hash) {
+                        infected.lock().unwrap().push(InfectedFile { 
+                            path: file.to_string_lossy().to_string(), 
+                            malware_name: sig.name.clone(), 
+                            hash: hex::encode(hash), 
+                            malware_size: Some(file_size) 
+                        });
+                        found = true;
+                    }
+                }
+            }
+
+            if !found {
+                clean_count.fetch_add(1, Ordering::Relaxed);
+            }
+
+            pb.inc(1);
+        });
+    }
+
+    fn scan_file_data(
+        &self,
+        path: &Path,
+        needs_md5: bool,
+        needs_sha256: bool
+    ) -> Result<(Vec<u8>, Option<[u8; 16]>, Option<[u8; 32]>), Error> {
+        let file = File::open(path)?;
+        let mut reader = BufReader::new(file);
+        let mut buffer = [0u8; 8192];
+
+        let mut md5 = if needs_md5 {
+            Some(md5::Md5::new())
+        } else {
+            None
+        };
+        let mut sha256 = if needs_sha256 {
+            Some(sha2::Sha256::new())
+        } else {
+            None
+        };
+
+        let mut magic_buf = Vec::with_capacity(16);
+        let mut total_read = 0;
+
+        loop {
+            let n = reader.read(&mut buffer)?;
+            if n == 0 {
+                break;
+            }
+
+            if total_read < 16 {
+                let needed = 16 - total_read;
+                magic_buf.extend_from_slice(&buffer[..n.min(needed)]);
+            }
+
+            if let Some(ref mut hasher) = md5 {
+                hasher.update(&buffer[..n]);
+            }
+
+            if let Some(ref mut hasher) = sha256 {
+                hasher.update(&buffer[..n]);
+            }
+
+            total_read += n;
+        }
+
+        let md5_hash = md5.map(|h| h.finalize().into());
+        let sha256_hash = sha256.map(|h| h.finalize().into());
+
+        Ok((magic_buf, md5_hash, sha256_hash))
     }
 
     fn build_result(&self, path: &Path, file_size: u64, signature_info: &SignatureInfo, hash: String) -> ScanResult {
