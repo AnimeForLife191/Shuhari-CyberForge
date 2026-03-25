@@ -19,7 +19,6 @@ use takeri::{
     scanner::display_malware_scan
 };
 
-/// Shuhari-CyberForge: Experimental security tools for educational purposes
 #[derive(Parser)]
 struct Cli {
     #[command(subcommand)]
@@ -30,7 +29,6 @@ struct Cli {
     verbose: bool
 }
 
-// This is where tools can be added to the CLI and be given subcommands
 #[derive(Subcommand)]
 enum Command {
     #[cfg(target_os = "windows")]
@@ -42,7 +40,6 @@ enum Command {
     Takeri(TakeriCommand)
 }
 
-// This is the subcommands for Shugo
 #[cfg(target_os = "windows")]
 #[derive(Subcommand)]
 enum ShugoCommand {
@@ -61,19 +58,6 @@ enum ShugoCommand {
 
 #[derive(Subcommand)]
 enum TakeriCommand {
-    // Hash {
-        // path: PathBuf,
-
-        // #[arg(short, long, default_value = "md5")]
-        // algorithm: String,
-
-        // #[arg(short, long)]
-        // recursive: bool,
-
-        // #[arg(short, long)]
-        // output: PathBuf
-    // },
-
     Scan {
         path: PathBuf,
 

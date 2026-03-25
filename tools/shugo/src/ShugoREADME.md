@@ -26,7 +26,10 @@ cd Shuhari-CyberForge
 cargo build --release
 ```
 
-Executable will be at `target\release\Shuhari-CyberForge-cli.exe`
+Executable will be at 
+```bash
+target\release\Shuhari-CyberForge-CLI.exe
+```
 
 ## Usage
 

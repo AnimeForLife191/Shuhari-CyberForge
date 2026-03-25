@@ -50,9 +50,9 @@ I believe it can be better, more affordable, more transparent, and more feature-
 
 Four foundational tools that will always be 100% open source:
 
-- **Shugo** - System Audit and Educator *(MVP Available Now - [ShugoREADME.md](./tools/shugo/src/ShugoREADME.md))*
-- **Takeri** - Malware Scanner *(In Development)*
-- **[Name TBD]** - Network Security *(Planned)*
+- **Shugo (守護)** - System Audit and Educator *(MVP Available Now - [ShugoREADME.md](./tools/shugo/src/ShugoREADME.md))*
+- **Takeri (猛)** - Malware Scanner *(MVP Available Now - [TakeriREADME.md](./tools/takeri/src/TakeriREADME.md))*
+- **Tōrusei (透星)** - Network Security *(In Development)*
 - **[Name TBD]** - Password Manager *(Planned)*
 
 ### Maybe Someday
