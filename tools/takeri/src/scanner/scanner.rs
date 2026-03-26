@@ -244,8 +244,6 @@ impl MalwareScanner {
                     extension: ext.to_string(), 
                     actual_format: actual_format.to_string() 
                 });
-                pb.inc(1);
-                return;
             }
 
             let mut found = false;
